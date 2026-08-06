@@ -7,11 +7,9 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.dev.timeflow.Data.Model.Events
 import com.dev.timeflow.Data.Model.NotificationAlarmManagerModel
 import com.dev.timeflow.Data.Model.Tasks
 import com.dev.timeflow.Data.Repo.DataStoreRepo
-import com.dev.timeflow.Data.Repo.EventRepo
 import com.dev.timeflow.Data.Repo.TaskRepo
 import com.dev.timeflow.Managers.notification.TimeFlowAlarmManagerService
 import com.dev.timeflow.View.Navigation.Routes
@@ -34,7 +32,6 @@ import javax.inject.Inject
 @HiltViewModel
 class TaskAndEventViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val eventRepo: EventRepo,
     private val dataStoreRepo: DataStoreRepo,
     private val taskRepo: TaskRepo
 ) : ViewModel(){
@@ -52,7 +49,7 @@ class TaskAndEventViewModel @Inject constructor(
            val i = readOnBoardingState().first()
             _isCompleted.value = i
             if (i){
-                _startDestination.value = Routes.TimerScreen.route
+                _startDestination.value = Routes.CalendarScreen.route
             }else{
                 _startDestination.value = Routes.WelcomeScreen.route
             }
@@ -60,20 +57,12 @@ class TaskAndEventViewModel @Inject constructor(
             _isLoading.value = false
 
             getAllTasks()
-            getAllEvents()
         }
     }
 
     // job to track and cancel the task fetch operation
     private var taskJob: Job? = null
 
-    // job to track and cancel the event fetch operation
-    private var eventJob: Job? = null
-
-
-    // variable to hold all the events in the database
-    private val _allEvents = MutableStateFlow<List<Events>>(emptyList())
-    var allEvents : StateFlow<List<Events>> = _allEvents.asStateFlow()
 
     private val _currentTask = MutableStateFlow<Tasks?>(null)
     var currentTask = _currentTask
@@ -88,120 +77,12 @@ class TaskAndEventViewModel @Inject constructor(
     }
 
 
-    private val _currentEvent = MutableStateFlow<Events?>(null)
-    var currentEvent = _currentEvent.asStateFlow()
-
-    fun selectEvent(events: Events){
-        _currentEvent.value = events
-    }
-
-    fun clearEvent(){
-        _currentEvent.value = null
-    }
-
     var scrollStateValue = MutableStateFlow<Int>(0)
 
     fun manageScrollState(scrollValue: Int){
         scrollStateValue.value = scrollValue
     }
 
-    // function to get all the events from the database
-    fun getAllEvents() {
-        viewModelScope.launch {
-            val events = eventRepo.getAllEvents()
-            events.collect {
-                _allEvents.value = it
-            }
-        }
-    }
-
-
-    private val _eventsForToday = MutableStateFlow<List<Events>>(emptyList())
-    var eventForToday : StateFlow<List<Events>> = _eventsForToday
-
-    // function to get event for a date
-    fun getEventForToday(start: Long, end: Long){
-        viewModelScope.launch {
-            eventRepo.getEventsForADate(
-                start = start,
-                end = end
-            ).collect {
-                _eventsForToday.value = it
-                Log.d("Events","${it}")
-            }
-        }
-    }
-
-
-
-
-
-    // function to insert an event into the database
-    fun insertEvent(events: Events){
-        viewModelScope.launch(Dispatchers.IO) {
-            eventRepo.insertEvent(
-                events = events
-            )
-            if (events.notification && events.eventNotificationTime != 0.toLong()){
-               scheduleNotification(
-
-                   // type -0
-                   notificationAlarmManagerModel = NotificationAlarmManagerModel(
-                       id = events.id,
-                       title = events.name,
-                       type = 0,
-                       startTime = events.eventStartTime,
-                       endTime = events.eventEndTime,
-                       hour = events.eventNotificationTime.toHour(),
-                       minute = events.eventNotificationTime.toMinute(),
-                       localDate = events.eventNotificationTime.toLocalDate(),
-                   )
-               )
-            } else {
-                println("notification has been turned off")
-            }
-        }
-    }
-
-
-    fun updateEvent(events: Events){
-        viewModelScope.launch {
-            eventRepo.updateEvent(
-                events = events
-            )
-        }
-    }
-
-
-    // function to delete an event from the database
-    fun deleteEvent(events: Events){
-        viewModelScope.launch(Dispatchers.IO) {
-            eventRepo.deleteEvent(
-                events = events
-            )
-        }
-    }
-
-
-    private val _eventForDate = MutableStateFlow<List<Events>>(emptyList())
-    var eventForDate: StateFlow<List<Events>> = _eventForDate
-
-    fun getAllEventsForADate(start: Long, end: Long) {
-
-        // cancel the previous job
-        eventJob?.cancel()
-
-        _eventForDate.value = emptyList()
-        eventJob = viewModelScope.launch {
-            eventRepo.getEventsForADate(
-                start = start,
-                end = end
-            ).collect {
-                _eventForDate.value = it
-            }
-
-        }
-    }
 
     // variable to hold the all the tasks in the database
     private val _allTasks = MutableStateFlow<List<Tasks>>(emptyList())

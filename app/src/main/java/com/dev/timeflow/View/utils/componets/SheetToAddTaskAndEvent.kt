@@ -101,20 +101,9 @@ fun SheetToAddEventAndTask(
     taskName : String,
     taskDescription : String,
     selectedImportantChip : Int,
-
 ) {
     val localContext = LocalContext.current
     val primary = MaterialTheme.colorScheme.primary
-    val formatter = DateTimeFormatter.ofPattern("h:mm a")
-    val fromFormattedTime = remember(fromTimePickerState.hour, fromTimePickerState.minute) {
-        val localTime = LocalTime.of(fromTimePickerState.hour, fromTimePickerState.minute)
-
-        localTime.format(formatter)
-    }
-    val toFormattedTime = remember(toTimePickerState.hour, toTimePickerState.minute) {
-        val localTime = LocalTime.of(toTimePickerState.hour, toTimePickerState.minute)
-        localTime.format(formatter)
-    }
 
     ModalBottomSheet(
       sheetState = rememberModalBottomSheetState(
@@ -130,97 +119,58 @@ fun SheetToAddEventAndTask(
                 .padding(
                     horizontal = 24.dp
                 ),
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.End
         ) {
-
-            Row {
-                savingChipList.forEachIndexed {
-                        index , type ->
-                    FilterChip(
-                        modifier = modifier.padding(
-                            end = 4.dp
-                        ),
-                        selected = index == selectedSavingType,
-                        onClick = {
-                            hapticFeedback.performHapticFeedback(
-                                hapticFeedbackType = HapticFeedbackType.Confirm
-                            )
-                            changeSavingType.invoke(index)
-                        },
-                        label = {
-                            Text(
-                                text = type.title
-                            )
-                        },
-                        leadingIcon = {
-                            Icon(
-                                modifier = modifier.size(FilterChipDefaults.IconSize),
-                                imageVector = type.icon,
-                                contentDescription = null
-                            )
-                        }
+            ToggleButton(
+                colors = ToggleButtonDefaults.toggleButtonColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                ),
+                checked = switchState,
+                onCheckedChange = {
+                    onSwitchState.invoke(
+                        it
                     )
-                }
-            }
-            Row {
-
-                Spacer(
-                    modifier = modifier.width(4.dp)
-                )
-                ToggleButton(
-                    colors = ToggleButtonDefaults.toggleButtonColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant
-                    ),
-                    checked = switchState,
-                    onCheckedChange = {
-                        onSwitchState.invoke(
-                            it
-                        )
-                        if (it) {
-                            // for a13 and a13 + devices
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                val hasPermission = ContextCompat.checkSelfPermission(
+                    if (it) {
+                        // for a13 and a13 + devices
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            val hasPermission = ContextCompat.checkSelfPermission(
                                     localContext,
                                     Manifest.permission.POST_NOTIFICATIONS
                                 ) == PackageManager.PERMISSION_GRANTED
-                                // if permission is denied <umm i can show a dialog to navigate to the app info page
-                                if (!hasPermission) {
-                                    onSwitchState.invoke(false)
-                                    onTimeState.invoke(false)
-                                    Toast.makeText(
-                                        localContext,
-                                        "Please grant notification permission to enable reminders",
-                                        Toast.LENGTH_LONG
-                                    ).show()
-                                    onPermissionState.invoke(true)
-
-                                } else {
-                                    // if permission is granted we are showwing the picker
-                                    onTimeState.invoke(
-                                        true
-                                    )
-                                }
-
+                            // if permission is denied
+                            if (!hasPermission) {
+                                onSwitchState.invoke(false)
+                                onTimeState.invoke(false)
+                                Toast.makeText(
+                                    localContext,
+                                    "Please grant notification permission to enable reminders",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                                onPermissionState.invoke(true)
                             } else {
-                                // for devices below a13 <<<
-                                onTimeState.invoke(true)
+                                // if permission is granted we are showing the picker
+                                onTimeState.invoke(
+                                    true
+                                )
                             }
                         } else {
-                            // picker will never show cux we are passsing ffalse
-                            onTimeState.invoke(false)
+                            // for devices below a13
+                            onTimeState.invoke(true)
                         }
-
-
-                        hapticFeedback.performHapticFeedback(
-                            hapticFeedbackType = HapticFeedbackType.Confirm
-                        )
+                    } else {
+                        // picker will never show cuz we are passing false
+                        onTimeState.invoke(false)
                     }
-                ) {
-                    Icon(
-                        imageVector = Lucide.Bell,
-                        contentDescription = null
+
+                    hapticFeedback.performHapticFeedback(
+                        hapticFeedbackType = HapticFeedbackType.Confirm
                     )
                 }
+            ) {
+                Icon(
+                    imageVector = Lucide.Bell,
+                    contentDescription = null
+                )
             }
         }
         Column(
@@ -244,7 +194,7 @@ fun SheetToAddEventAndTask(
                 },
                 placeholder = {
                     Text(
-                        text = if(selectedSavingType ==0) "Event name" else "Task name"
+                        text = "Task name"
                     )
                 },
                 value = taskName,
@@ -277,7 +227,6 @@ fun SheetToAddEventAndTask(
                         contentDescription = null,
                     )
                 },
-
                 placeholder = {
                     Text(
                         text = "Description(optional)"
@@ -298,172 +247,57 @@ fun SheetToAddEventAndTask(
                 modifier = modifier.height(8.dp)
             )
 
-           AnimatedContent(
-               targetState = selectedSavingType == 0
-           ) {
-               if (it){
-                   Column() {
-                       ListItem(
-                           colors = ListItemDefaults.colors(
-                               containerColor = MaterialTheme.colorScheme.surfaceContainer
-                           ),
-                           modifier = modifier
-                               .clip(RoundedCornerShape(12.dp))
-                               .clickable(
-                                   onClick = {
-
-                                   }
-                               ),
-                           overlineContent = {
-                               Text(
-                                   text = "Start"
-                               )
-                           },
-                           headlineContent = {
-                               Row(
-                                   modifier = modifier.fillMaxWidth(),
-                                   verticalAlignment = Alignment.CenterVertically,
-                                   horizontalArrangement = Arrangement.SpaceBetween
-                               ) {
-                                   AssistChip(
-                                       label = {
-                                           Text(
-                                               text = fromDatePickerState.selectedDateMillis?.toLocalDate()!!.format(
-                                                   DateTimeFormatter.ofPattern("MMMM d yyyy")
-                                               ),
-                                               color = primary
-                                           )
-                                       },
-                                       onClick = {
-                                           onFromTileClick.invoke()
-                                       }
-                                   )
-
-
-                                   TextButton(
-                                       onClick = {
-                                           onFromTimePicker.invoke()
-                                       }
-                                   ) {
-                                       Text(
-                                           text = fromFormattedTime,
-                                           color = primary
-                                       )
-                                   }
-
-                               }
-                           },
-
-                       )
-                       Spacer(
-                           modifier = modifier.height(8.dp)
-                       )
-                       ListItem(
-                           colors = ListItemDefaults.colors(
-                               containerColor = MaterialTheme.colorScheme.surfaceContainer
-                           ),
-                           modifier = modifier.clip(RoundedCornerShape(12.dp)),
-                           overlineContent = {
-                               Text(
-                                   text = "End"
-                               )
-                           },
-                           headlineContent = {
-                               Row(
-                                   modifier = modifier.fillMaxWidth(),
-                                   verticalAlignment = Alignment.CenterVertically,
-                                   horizontalArrangement = Arrangement.SpaceBetween
-                               ) {
-                                   AssistChip(
-                                       onClick = {
-                                           onToTileClick.invoke()
-                                       },
-                                       label = {
-                                           Text(
-                                               text = toDatePickerState.selectedDateMillis!!.toLocalDate()
-                                                   .format(
-                                                       DateTimeFormatter.ofPattern("MMMM d yyyy")
-                                                   ),
-                                               color = primary
-                                           )
-                                       }
-                                   )
-
-                                   TextButton(
-                                           onClick = {
-                                               onToTimePicker.invoke()
-                                           }
-                                       ) {
-                                           Text(
-                                               text = toFormattedTime,
-                                               color = primary
-                                           )
-                                       }
-
-                               }
-                           },
-
-                       )
-                   }
-               }
-           }
-            AnimatedContent(
-                targetState = selectedSavingType == 1
-            ) {
-                if (it) {
-                    Column {
-                        Text(
-                            text = "Priority",
-                            style = MaterialTheme.typography.labelLarge.copy(
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        )
-                        Row (
-                            modifier = modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.Start
-                        ){
-                            importanceChip.forEachIndexed {
-                                    index , chip ->
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    FilterChip(
-                                        modifier = modifier.padding(
-                                            end = 4.dp
-                                        ),
-                                        selected = selectedImportantChip == index,
-                                        onClick = {
-                                            onSelectedImportantChipChange.invoke(index)
-                                            hapticFeedback.performHapticFeedback(
-                                                hapticFeedbackType = HapticFeedbackType.Confirm
-                                            )
-                                        },
-                                        label = {
-                                            Text(
-                                                text = chip.label
-                                            )
-                                        },
-                                        leadingIcon = {
-                                            Icon(
-                                                modifier = modifier.size(
-                                                    FilterChipDefaults.IconSize
-                                                ),
-                                                imageVector = Lucide.FlagTriangleRight,
-                                                contentDescription = null,
-                                                tint = chip.color
-                                            )
-                                        }
+            Column {
+                Text(
+                    text = "Priority",
+                    style = MaterialTheme.typography.labelLarge.copy(
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                )
+                Row (
+                    modifier = modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Start
+                ){
+                    importanceChip.forEachIndexed {
+                            index , chip ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            FilterChip(
+                                modifier = modifier.padding(
+                                    end = 4.dp
+                                ),
+                                selected = selectedImportantChip == index,
+                                onClick = {
+                                    onSelectedImportantChipChange.invoke(index)
+                                    hapticFeedback.performHapticFeedback(
+                                        hapticFeedbackType = HapticFeedbackType.Confirm
                                     )
-
+                                },
+                                label = {
+                                    Text(
+                                        text = chip.label
+                                    )
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        modifier = modifier.size(
+                                            FilterChipDefaults.IconSize
+                                        ),
+                                        imageVector = Lucide.FlagTriangleRight,
+                                        contentDescription = null,
+                                        tint = chip.color
+                                    )
                                 }
-                            }
+                            )
                         }
                     }
                 }
             }
+
             AnimatedContent(
-                targetState = switchState && selectedSavingType ==1, transitionSpec = {
+                targetState = switchState, transitionSpec = {
                     scaleIn() togetherWith scaleOut()
                 }) {
                 if (it) {
@@ -494,11 +328,7 @@ fun SheetToAddEventAndTask(
                     ),
                 shape = RoundedCornerShape(12.dp),
                 onClick = {
-                    if (selectedSavingType == 0) {
-                        onEventSave.invoke()
-                    } else {
-                        onTaskSave.invoke()
-                    }
+                    onTaskSave.invoke()
                     onDismiss.invoke()
                 }
             ) {

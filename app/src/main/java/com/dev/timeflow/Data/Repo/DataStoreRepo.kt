@@ -74,7 +74,7 @@ class DataStoreRepo @Inject constructor(
             if (it is IOException) emit(emptyPreferences()) else throw  it
         }.map {
             type ->
-            val calendarType = type[PrefKey.selectedCalendarType] ?:0
+            val calendarType = type[PrefKey.selectedCalendarType] ?:1
             calendarType
         }
     }

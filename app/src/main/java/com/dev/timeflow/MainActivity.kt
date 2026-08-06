@@ -11,7 +11,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.dev.timeflow.Data.Repo.DataStoreRepo
-import com.dev.timeflow.Managers.WidgetAlarmService
 import com.dev.timeflow.View.Navigation.NavGraph
 import com.dev.timeflow.View.Navigation.Routes
 
@@ -31,7 +30,6 @@ class MainActivity : ComponentActivity() {
         installSplashScreen().setKeepOnScreenCondition {
             keepSplashScreen
         }
-        WidgetAlarmService(this).scheduleAlarmForUpdatingWidgets()
         enableEdgeToEdge()
         setContent {
             TimeFlowTheme {
@@ -41,7 +39,7 @@ class MainActivity : ComponentActivity() {
                     val isCompleted = dataStoreRepo.readOnBoarding()
                         .collect {
                             if (it){
-                                startDest = Routes.TimerScreen.route
+                                startDest = Routes.CalendarScreen.route
                             }else {
                                 startDest = Routes.WelcomeScreen.route
                             }

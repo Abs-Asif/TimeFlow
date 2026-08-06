@@ -75,7 +75,6 @@ import com.composables.icons.lucide.User
 import com.dev.timeflow.Data.Model.DropdownModel
 import com.dev.timeflow.View.Screens.AboutScreen
 import com.dev.timeflow.View.Screens.CalenderScreen
-import com.dev.timeflow.View.Screens.TodayScreen
 import com.dev.timeflow.View.Screens.onBoarding.FeatureScreen
 import com.dev.timeflow.View.Screens.onBoarding.NotificationScreen
 import com.dev.timeflow.View.Screens.onBoarding.WelcomeScreen
@@ -91,7 +90,7 @@ fun NavGraph(modifier: Modifier = Modifier, startDest : String) {
     var showDropDown by rememberSaveable { mutableStateOf(false) }
     var showTimerScreenDropDown by rememberSaveable { mutableStateOf(false) }
 
-    val isCompleted = startDest == Routes.TimerScreen.route && currentRoute?.destination?.route != Routes.AboutScreen.route
+    val isCompleted = startDest == Routes.CalendarScreen.route && currentRoute?.destination?.route != Routes.AboutScreen.route
 
     var userName by rememberSaveable {mutableStateOf("") }
     val taskAndEventViewModel : TaskAndEventViewModel = hiltViewModel()
@@ -218,176 +217,155 @@ if (showNameChange){
                           )
                       },
                       actions = {
-                          AnimatedContent(
-                              targetState = currentRoute?.destination?.route== Routes.CalendarScreen.route,
-                              transitionSpec = {
-                                  scaleIn(
-                                      animationSpec = spring(
-                                          dampingRatio = Spring.DampingRatioMediumBouncy,
-                                          stiffness = Spring.StiffnessLow
-                                      )
-                                  ) togetherWith scaleOut(
-                                      animationSpec = spring(
-                                          dampingRatio = Spring.DampingRatioMediumBouncy,
-                                          stiffness = Spring.StiffnessLow
-                                      )
-                                  )
+                          IconButton(
+                              onClick = {
+                                  showDropDown = !showDropDown
                               }
                           ) {
-                              if (it){
-                                  IconButton(
-                                      onClick = {
-                                          showDropDown = !showDropDown
-                                      }
-                                  ) {
-                                      Icon(
-                                          imageVector = Lucide.CalendarRange,
-                                          contentDescription = null
-                                      )
-                                  }
+                              Icon(
+                                  imageVector = Lucide.CalendarRange,
+                                  contentDescription = null
+                              )
+                          }
 
-                                  DropdownMenu(
-                                      expanded = showDropDown,
-                                      onDismissRequest = { showDropDown = false }
-                                  ) {
-                                      dropdownItem.forEachIndexed { index, model ->
+                          DropdownMenu(
+                              expanded = showDropDown,
+                              onDismissRequest = { showDropDown = false }
+                          ) {
+                              dropdownItem.forEachIndexed { index, model ->
 
-                                          val isSelected = selectedCalendarType == index
+                                  val isSelected = selectedCalendarType == index
 
-                                          DropdownMenuItem(
-                                              modifier = Modifier
-                                                  .fillMaxWidth()
-                                                  .padding(
-                                                      horizontal = 4.dp, vertical = 2.dp
-                                                  )
-                                                  .clip(RoundedCornerShape(8.dp))
-
-                                                  .background(
-                                                      if (isSelected) MaterialTheme.colorScheme.primaryContainer
-                                                      else MaterialTheme.colorScheme.surface
-                                                  ),
-                                              text = {
-                                                  Row(
-                                                      verticalAlignment = Alignment.CenterVertically,
-                                                      modifier = Modifier.fillMaxWidth()
-                                                  ) {
-                                                      Icon(
-                                                          imageVector = model.icon,
-                                                          contentDescription = null,
-                                                          tint = if (isSelected) MaterialTheme.colorScheme.primary
-                                                          else MaterialTheme.colorScheme.onSurface
-                                                      )
-
-                                                      Spacer(Modifier.width(8.dp))
-
-                                                      Text(
-                                                          text = model.title,
-                                                          color = if (isSelected) MaterialTheme.colorScheme.primary
-                                                          else MaterialTheme.colorScheme.onSurface
-                                                      )
-                                                  }
-                                              },
-                                              onClick = {
-                                                  model.onClick()
-                                                  showDropDown = false
-                                              }
+                                  DropdownMenuItem(
+                                      modifier = Modifier
+                                          .fillMaxWidth()
+                                          .padding(
+                                              horizontal = 4.dp, vertical = 2.dp
                                           )
-                                      }
-                                  }
+                                          .clip(RoundedCornerShape(8.dp))
 
+                                          .background(
+                                              if (isSelected) MaterialTheme.colorScheme.primaryContainer
+                                              else MaterialTheme.colorScheme.surface
+                                          ),
+                                      text = {
+                                          Row(
+                                              verticalAlignment = Alignment.CenterVertically,
+                                              modifier = Modifier.fillMaxWidth()
+                                          ) {
+                                              Icon(
+                                                  imageVector = model.icon,
+                                                  contentDescription = null,
+                                                  tint = if (isSelected) MaterialTheme.colorScheme.primary
+                                                  else MaterialTheme.colorScheme.onSurface
+                                              )
 
-                              }else{
-                                  IconButton(
+                                              Spacer(Modifier.width(8.dp))
+
+                                              Text(
+                                                  text = model.title,
+                                                  color = if (isSelected) MaterialTheme.colorScheme.primary
+                                                  else MaterialTheme.colorScheme.onSurface
+                                              )
+                                          }
+                                      },
                                       onClick = {
-                                          showTimerScreenDropDown = true
+                                          model.onClick()
+                                          showDropDown = false
                                       }
-                                  ) {
+                                  )
+                              }
+                          }
+
+                          IconButton(
+                              onClick = {
+                                  showTimerScreenDropDown = !showTimerScreenDropDown
+                              }
+                          ) {
+                              Icon(
+                                  imageVector = Lucide.EllipsisVertical,
+                                  contentDescription = null
+                              )
+                          }
+
+                          DropdownMenu(
+                              expanded = showTimerScreenDropDown,
+                              onDismissRequest = {
+                                  showTimerScreenDropDown = false
+                              }
+                          ) {
+                              DropdownMenuItem(
+                                  leadingIcon = {
                                       Icon(
-                                          imageVector = Lucide.EllipsisVertical,
+                                          imageVector = Lucide.User,
                                           contentDescription = null
                                       )
+                                  },
+                                  onClick = {
+                                      showTimerScreenDropDown = false
+                                      showNameChange = true
+                                  },
+                                  text = {
+                                      Text("Change name")
                                   }
-
-                                  DropdownMenu(
-                                      expanded = showTimerScreenDropDown,
-                                      onDismissRequest = {
-                                          showTimerScreenDropDown = false
-                                      }
-                                  ) {
-                                      DropdownMenuItem(
-                                          leadingIcon = {
-                                              Icon(
-                                                  imageVector = Lucide.User,
-                                                  contentDescription = null
-                                              )
-                                          },
-                                          onClick = {
-                                              showTimerScreenDropDown = false
-                                              showNameChange = true
-                                          },
-                                          text = {
-                                              Text("Change name")
-                                          }
+                              )
+                              DropdownMenuItem(
+                                  leadingIcon = {
+                                      Icon(
+                                          imageVector = Lucide.Dock,
+                                          contentDescription = null
                                       )
-                                      DropdownMenuItem(
-                                          leadingIcon = {
-                                              Icon(
-                                                  imageVector = Lucide.Dock,
-                                                  contentDescription = null
-                                              )
-                                          },
-                                          onClick = {
-                                              showTimerScreenDropDown = false
-                                              val url = "https://timeflow.framer.website/privacypolicy"
-                                              val intent =
-                                                  Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url))
-                                              context.startActivity(intent)
-                                          },
-                                          text = {
-                                              Text("Privacy Policy")
-                                          }
-                                      )
-                                      DropdownMenuItem(
-                                          leadingIcon = {
-                                              Icon(
-                                                  imageVector = Lucide.Star,
-                                                  contentDescription = null
-                                              )
-                                          },
-                                          onClick = {
-
-                                              showTimerScreenDropDown = false
-
-                                              val url =
-                                                  "https://play.google.com/store/apps/details?id=com.dev.timeflow"
-                                              val intent =
-                                                  Intent(Intent.ACTION_VIEW, url.toUri())
-                                              context.startActivity(intent)
-
-
-                                          },
-                                          text = {
-                                              Text("Rate Timeflow")
-                                          }
-                                      )
-                                      DropdownMenuItem(
-                                          leadingIcon = {
-                                              Icon(
-                                                  imageVector = Lucide.Info,
-                                                  contentDescription = null
-                                              )
-                                          },
-                                          onClick = {
-                                              navController.navigate(Routes.AboutScreen.route)
-                                              showTimerScreenDropDown = false
-
-                                          },
-                                          text = {
-                                              Text("About")
-                                          }
-                                      )
+                                  },
+                                  onClick = {
+                                      showTimerScreenDropDown = false
+                                      val url = "https://timeflow.framer.website/privacypolicy"
+                                      val intent =
+                                          Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url))
+                                      context.startActivity(intent)
+                                  },
+                                  text = {
+                                      Text("Privacy Policy")
                                   }
-                              }
+                              )
+                              DropdownMenuItem(
+                                  leadingIcon = {
+                                      Icon(
+                                          imageVector = Lucide.Star,
+                                          contentDescription = null
+                                      )
+                                  },
+                                  onClick = {
+
+                                      showTimerScreenDropDown = false
+
+                                      val url =
+                                          "https://play.google.com/store/apps/details?id=com.dev.timeflow"
+                                      val intent =
+                                          Intent(Intent.ACTION_VIEW, url.toUri())
+                                      context.startActivity(intent)
+
+
+                                  },
+                                  text = {
+                                      Text("Rate Timeflow")
+                                  }
+                              )
+                              DropdownMenuItem(
+                                  leadingIcon = {
+                                      Icon(
+                                          imageVector = Lucide.Info,
+                                          contentDescription = null
+                                      )
+                                  },
+                                  onClick = {
+                                      navController.navigate(Routes.AboutScreen.route)
+                                      showTimerScreenDropDown = false
+
+                                  },
+                                  text = {
+                                      Text("About")
+                                  }
+                              )
                           }
                       }
                   )
@@ -397,15 +375,6 @@ if (showNameChange){
            floatingActionButton = {
 
            },
-           bottomBar = {
-               if (isCompleted) {
-                   FloatingBottomNav(
-                       navController = navController
-                   )
-               }
-           },
-
-
            contentWindowInsets = WindowInsets(0.dp),
 
            ) { p ->
@@ -423,10 +392,6 @@ if (showNameChange){
                    popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) },
                    popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) }
                ) {
-                   composable(route = Routes.TimerScreen.route) {
-                       TodayScreen()
-                   }
-
                    composable(route = Routes.CalendarScreen.route) {
                        CalenderScreen(
                            selectedTab = selectedCalendarType
@@ -452,7 +417,7 @@ if (showNameChange){
                    composable(route = Routes.NotificationScreen.route) {
                        NotificationScreen(
                            onNavigate = {
-                               navController.navigate(Routes.TimerScreen.route)
+                               navController.navigate(Routes.CalendarScreen.route)
                            }
                        )
                    }
@@ -472,25 +437,3 @@ if (showNameChange){
 
 
 
-
-data class BottomNavAttribute(
-    val title : String,
-    val unselectedIcon : ImageVector,
-    val selectedIcon : ImageVector,
-    val route: Routes
-)
-
-val bottomNavItems = listOf(
-    BottomNavAttribute(
-        title = "Home",
-        unselectedIcon = Icons.Outlined.Home,
-        selectedIcon = Icons.Filled.Home,
-        route = Routes.TimerScreen
-    ),
-    BottomNavAttribute(
-        title = "Tasks",
-        unselectedIcon = Icons.Outlined.TaskAlt,
-        selectedIcon = Icons.Filled.TaskAlt,
-        route = Routes.CalendarScreen
-    ),
-)

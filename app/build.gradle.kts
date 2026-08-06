@@ -12,12 +12,17 @@ android {
     namespace = "com.dev.timeflow"
     compileSdk = 36
 
+    val releaseStoreFilePath = project.findProperty("RELEASE_STORE_FILE")?.toString()
+    val isReleaseKeystoreProvided = !releaseStoreFilePath.isNullOrEmpty() && file(releaseStoreFilePath).exists()
+
     signingConfigs {
         create("release") {
-            storeFile = file(project.findProperty("RELEASE_STORE_FILE")?.toString() ?: "debug.keystore")
-            storePassword = project.findProperty("RELEASE_STORE_PASSWORD")?.toString() ?: "android"
-            keyAlias = project.findProperty("RELEASE_KEY_ALIAS")?.toString() ?: "androiddebugkey"
-            keyPassword = project.findProperty("RELEASE_KEY_PASSWORD")?.toString() ?: "android"
+            if (isReleaseKeystoreProvided) {
+                storeFile = file(releaseStoreFilePath!!)
+                storePassword = project.findProperty("RELEASE_STORE_PASSWORD")?.toString() ?: ""
+                keyAlias = project.findProperty("RELEASE_KEY_ALIAS")?.toString() ?: ""
+                keyPassword = project.findProperty("RELEASE_KEY_PASSWORD")?.toString() ?: ""
+            }
         }
     }
 
@@ -42,7 +47,11 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("release")
+            signingConfig = if (isReleaseKeystoreProvided) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 

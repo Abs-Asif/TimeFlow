@@ -4,7 +4,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import com.dev.timeflow.Data.Model.NotificationAlarmManagerModel
-import com.dev.timeflow.Data.Repo.EventRepo
 import com.dev.timeflow.Data.Repo.TaskRepo
 import com.dev.timeflow.Managers.notification.TimeFlowAlarmManagerService
 import com.dev.timeflow.View.utils.toHour
@@ -25,7 +24,6 @@ import javax.inject.Inject
 class BootCompleteReceiver (
 ) : BroadcastReceiver(){
     @Inject lateinit var taskRepo: TaskRepo
-    @Inject lateinit var eventRepo: EventRepo
     override fun onReceive(context: Context, intent: Intent) {
 
 
@@ -34,7 +32,6 @@ class BootCompleteReceiver (
 
 
         if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
-            WidgetAlarmService(context).scheduleAlarmForUpdatingWidgets()
 
             scope.launch {
 
@@ -43,7 +40,7 @@ class BootCompleteReceiver (
                         .atStartOfDay().atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
 
 
-                    val task = taskRepo.getTaskForScheduling(
+                    val notificationAlarmManagerModel = taskRepo.getTaskForScheduling(
                         start = startDay
                     ).first().map {
                         NotificationAlarmManagerModel(
@@ -55,23 +52,6 @@ class BootCompleteReceiver (
                             localDate = it.taskTime.toLocalDate()
                         )
                     }
-
-                    val event = eventRepo.getEventsForNotification(
-                        start = startDay
-                    ).first().map {
-                        NotificationAlarmManagerModel(
-                            id = it.id,
-                            title = it.name,
-                            type = 0,
-                            startTime = it.eventStartTime,
-                            endTime = it.eventEndTime,
-                            hour = it.eventNotificationTime.toHour(),
-                            minute = it.eventNotificationTime.toMinute(),
-                            localDate = it.eventNotificationTime.toLocalDate()
-                        )
-                    }
-
-                    val notificationAlarmManagerModel = task + event
 
                     TimeFlowAlarmManagerService(context = context).scheduleNotification(
                         notificationAlarmManagerModel = notificationAlarmManagerModel

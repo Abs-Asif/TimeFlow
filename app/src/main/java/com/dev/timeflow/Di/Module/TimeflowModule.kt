@@ -7,11 +7,8 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.datastore.preferences.preferencesDataStoreFile
 import androidx.room.Room
-import com.dev.timeflow.Data.Dao.EventDao
 import com.dev.timeflow.Data.Dao.TaskDao
-import com.dev.timeflow.Data.EventDatabase
 import com.dev.timeflow.Data.Repo.DataStoreRepo
-import com.dev.timeflow.Data.Repo.EventRepo
 import com.dev.timeflow.Data.TaskDatabase
 import dagger.Module
 import dagger.Provides
@@ -35,19 +32,6 @@ class TimeFlowModule (
         return context
     }
 
-    // provide the event database
-    @Singleton
-    @Provides
-    fun provideEventDatabase(
-        @ApplicationContext context: Context
-    ): EventDatabase {
-        return Room.databaseBuilder(
-            context,
-            EventDatabase::class.java,
-            "event_db"
-        ).build()
-    }
-
     // provide the task database
     @Singleton
     @Provides
@@ -68,26 +52,6 @@ class TimeFlowModule (
         taskDatabase: TaskDatabase
     ) : TaskDao{
         return taskDatabase.taskDao()
-    }
-
-    // provide the event dao
-    @Singleton
-    @Provides
-    fun provideEventDao(
-        eventDatabase: EventDatabase
-    ): EventDao {
-        return eventDatabase.eventDao()
-    }
-
-    // provides the event repository
-    @Singleton
-    @Provides
-    fun provideEventRepository(
-        eventDao: EventDao
-    ): EventRepo{
-        return EventRepo(
-            eventDao = eventDao
-        )
     }
 
     // provide the datastore prefrences

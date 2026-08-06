@@ -12,12 +12,21 @@ android {
     namespace = "com.dev.timeflow"
     compileSdk = 36
 
+    signingConfigs {
+        create("release") {
+            storeFile = file(project.findProperty("RELEASE_STORE_FILE")?.toString() ?: "debug.keystore")
+            storePassword = project.findProperty("RELEASE_STORE_PASSWORD")?.toString() ?: "android"
+            keyAlias = project.findProperty("RELEASE_KEY_ALIAS")?.toString() ?: "androiddebugkey"
+            keyPassword = project.findProperty("RELEASE_KEY_PASSWORD")?.toString() ?: "android"
+        }
+    }
+
     defaultConfig {
         applicationId = "com.dev.timeflow"
         minSdk = 27
         targetSdk = 36
         versionCode = 5
-        versionName = "1.2.1"
+        versionName = project.findProperty("versionName")?.toString() ?: "1.2.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -33,7 +42,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 

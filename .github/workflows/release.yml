@@ -1,0 +1,63 @@
+name: Build and Release APK
+
+on:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Generate Version Name
+        run: |
+          VERSION_NAME=$(date +'%Y.%m.%d.%H.%M')
+          echo "VERSION_NAME=$VERSION_NAME" >> $GITHUB_ENV
+
+      - name: Generate Demo Keystore
+        run: |
+          keytool -genkey -v -keystore release.keystore -alias demo-alias -keyalg RSA -keysize 2048 -validity 10000 -storepass demopassword -keypass demopassword -dname "CN=demo, OU=demo, O=demo, L=demo, S=demo, C=US"
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build Release APK
+        run: |
+          ./gradlew assembleRelease \
+            -PversionName=${{ env.VERSION_NAME }} \
+            -PRELEASE_STORE_FILE=../release.keystore \
+            -PRELEASE_STORE_PASSWORD=demopassword \
+            -PRELEASE_KEY_ALIAS=demo-alias \
+            -PRELEASE_KEY_PASSWORD=demopassword
+
+      - name: Rename APK
+        run: |
+          mv app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/release/TimeFlow-${{ env.VERSION_NAME }}.apk
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.VERSION_NAME }}
+          name: Release v${{ env.VERSION_NAME }}
+          body: |
+            Automatic release for merge to master.
+            Version: ${{ env.VERSION_NAME }}
+          files: |
+            app/build/outputs/apk/release/TimeFlow-${{ env.VERSION_NAME }}.apk
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

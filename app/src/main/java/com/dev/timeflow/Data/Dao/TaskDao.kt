@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.Flow
  interface TaskDao{
      // function to insert or add a task to the database
      @Insert
-     suspend fun insertTask(tasks: Tasks)
+     suspend fun insertTask(tasks: Tasks): Long
 
     // function to update the task
     @Upsert

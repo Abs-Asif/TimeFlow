@@ -36,15 +36,8 @@ class MainActivity : ComponentActivity() {
                var startDest by remember { mutableStateOf<String?>(null) }
 
                 LaunchedEffect(Unit) {
-                    val isCompleted = dataStoreRepo.readOnBoarding()
-                        .collect {
-                            if (it){
-                                startDest = Routes.CalendarScreen.route
-                            }else {
-                                startDest = Routes.WelcomeScreen.route
-                            }
-                            keepSplashScreen = false
-                        }
+                    startDest = Routes.CalendarScreen.route
+                    keepSplashScreen = false
                 }
 
 

@@ -11,35 +11,30 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
-import androidx.compose.material3.DisplayMode
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.Text
 import androidx.compose.material3.TimePicker
-import androidx.compose.material3.TimePickerDialog
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
@@ -50,59 +45,48 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import com.kizitonwose.calendar.compose.HorizontalCalendar
-import com.kizitonwose.calendar.compose.rememberCalendarState
-import com.kizitonwose.calendar.core.firstDayOfWeekFromLocale
-import java.time.LocalDate
-import java.time.YearMonth
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
-
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil3.compose.AsyncImage
-import com.composables.icons.lucide.Calendar
 import com.composables.icons.lucide.ListTodo
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Plus
 import com.dev.timeflow.Data.Model.ImportanceChipModel
 import com.dev.timeflow.Data.Model.SavingModel
 import com.dev.timeflow.Data.Model.Tasks
+import com.dev.timeflow.R
+import com.dev.timeflow.View.Screens.calenderScreen.MonthCalender
+import com.dev.timeflow.View.Screens.calenderScreen.MonthHeader
+import com.dev.timeflow.View.utils.componets.SheetToAddEventAndTask
+import com.dev.timeflow.View.utils.componets.SheetToEditTask
 import com.dev.timeflow.View.utils.componets.TaskTile
 import com.dev.timeflow.View.utils.endOfDayMillis
 import com.dev.timeflow.View.utils.toDateTimeInMillis
 import com.dev.timeflow.View.utils.toMillis
 import com.dev.timeflow.Viewmodel.TaskAndEventViewModel
-import com.dev.timeflow.R
-import com.dev.timeflow.View.Screens.calenderScreen.MonthCalender
-import com.dev.timeflow.View.Screens.calenderScreen.MonthHeader
-import com.dev.timeflow.View.Screens.calenderScreen.WeekCalender
-import com.dev.timeflow.View.utils.componets.SheetToAddEventAndTask
-import com.dev.timeflow.View.utils.componets.SheetToEditTask
-import com.dev.timeflow.View.utils.toUtcMillis
-import com.kizitonwose.calendar.compose.WeekCalendar
-import com.kizitonwose.calendar.compose.weekcalendar.rememberWeekCalendarState
-import com.kizitonwose.calendar.core.atStartOfMonth
-import kotlinx.coroutines.launch
-import java.time.Instant
+import com.kizitonwose.calendar.compose.HorizontalCalendar
+import com.kizitonwose.calendar.compose.rememberCalendarState
+import java.time.LocalDate
 import java.time.LocalTime
+import java.time.YearMonth
 import java.time.ZoneId
-import java.time.ZoneOffset
+import java.time.format.TextStyle
 import java.util.Calendar
-
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun CalenderScreen(
-    modifier: Modifier = Modifier,
-    selectedTab : Int
+    modifier: Modifier = Modifier
 ) {
     val haptics = LocalHapticFeedback.current
     val localContext = LocalContext.current
@@ -110,7 +94,8 @@ fun CalenderScreen(
     val currentMonth = remember { YearMonth.now() }
     val startMonth = remember { currentMonth.minusMonths(100) }
     val endMonth = remember { currentMonth.plusMonths(100) }
-    val firstDayOfWeek = remember { firstDayOfWeekFromLocale() }
+    val firstDayOfWeek = java.time.DayOfWeek.SATURDAY
+
     val state = rememberCalendarState(
         startMonth = startMonth,
         endMonth = endMonth,
@@ -119,41 +104,32 @@ fun CalenderScreen(
     )
     val currentDate = remember { LocalDate.now() }
 
-    val startDate = remember { currentMonth.minusMonths(100).atStartOfMonth() }
-    val endDate = remember { currentMonth.plusMonths(100).atEndOfMonth() }
-    val weekState = rememberWeekCalendarState(
-        startDate = startDate,
-        endDate = endDate,
-        firstVisibleWeekDate = currentDate,
-        firstDayOfWeek = firstDayOfWeek
-    )
-
-    //variable to hold state of the currently selected date
+    // Variable to hold state of the currently selected date
     var currentSelectedDate by rememberSaveable { mutableStateOf(LocalDate.now()) }
 
-    // var to hold the switch state of the bottom sheet
+    // Var to hold the switch state of the bottom sheet
     var switchState by rememberSaveable { mutableStateOf(false) }
 
-    // variable to hold state of the bottom sheet
+    // Variable to hold state of the bottom sheet
     var showBottomSheet by rememberSaveable { mutableStateOf(false) }
 
-    // var to hold state of the task name textfield
+    // Var to hold state of the task name textfield
     var taskName by rememberSaveable { mutableStateOf("") }
 
-    // var to hols the timePicker
+    // Var to hols the timePicker
     var showTime by rememberSaveable { mutableStateOf(false) }
 
-    // var to hold the navigate to app info page
-    var showPermissionDialog by rememberSaveable() {mutableStateOf(false) }
+    // Var to hold the navigate to app info page
+    var showPermissionDialog by rememberSaveable() { mutableStateOf(false) }
 
-    // var to hold the state of the task description textfield
+    // Var to hold the state of the task description textfield (hidden from UI)
     var taskDescription by rememberSaveable { mutableStateOf("") }
 
     var showTaskDetails by rememberSaveable { mutableStateOf(false) }
 
     val localTime = LocalTime.now()
 
-    // state for the timePicker
+    // State for the timePicker
     val timePickerState = rememberTimePickerState(
         is24Hour = false,
         initialHour = localTime.hour,
@@ -175,6 +151,7 @@ fun CalenderScreen(
 
     val tasksForDate by taskViewModel.taskForDate.collectAsState(emptyList())
     val currentTask by taskViewModel.currentTask.collectAsState(null)
+
     val importanceChip = listOf<ImportanceChipModel>(
         ImportanceChipModel(
             label = "Low",
@@ -190,7 +167,7 @@ fun CalenderScreen(
         )
     )
 
-    // var to hold the state of the importance chip
+    // Var to hold the state of the importance chip (hidden from UI)
     var selectedChip by rememberSaveable { mutableIntStateOf(0) }
 
     // Dummy states required by SheetToAddEventAndTask signature (but simplified inside)
@@ -200,6 +177,10 @@ fun CalenderScreen(
     val toDatePickerState = rememberDatePickerState()
 
     val dummySavingChipList = listOf(SavingModel("Task", Lucide.ListTodo))
+
+    // Determine the visible month and year for the TopAppBar
+    val visibleMonth = state.firstVisibleMonth.yearMonth.month.getDisplayName(TextStyle.FULL, Locale.getDefault())
+    val visibleYear = state.firstVisibleMonth.yearMonth.year
 
     if (showPermissionDialog){
         AlertDialog(
@@ -221,15 +202,15 @@ fun CalenderScreen(
                     onClick = {
                         showPermissionDialog = false
                         val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                            data = Uri.fromParts("package",localContext.packageName, null)
+                            data = Uri.fromParts("package", localContext.packageName, null)
                             addCategory(Intent.CATEGORY_DEFAULT)
                             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                         }
 
                         try {
                             localContext.startActivity(intent)
-                        }catch (e: Exception){
-                            Toast.makeText(localContext,"Some error has occurred", Toast.LENGTH_LONG).show()
+                        } catch (e: Exception){
+                            Toast.makeText(localContext, "Some error has occurred", Toast.LENGTH_LONG).show()
                         }
                     }
                 ) {
@@ -273,9 +254,9 @@ fun CalenderScreen(
                     tasks = Tasks(
                         id = 0,
                         name = taskName,
-                        description = taskDescription,
+                        description = "",
                         notification = switchState,
-                        importance = importanceChip[selectedChip].label,
+                        importance = "Low",
                         taskTime = if (switchState) Calendar.getInstance().toDateTimeInMillis(
                             hour = timePickerState.hour,
                             minute = timePickerState.minute,
@@ -330,7 +311,7 @@ fun CalenderScreen(
     if (showTaskDetails && currentTask != null) {
         val latestTask = tasksForDate.find { it.id == currentTask!!.id } ?: currentTask!!
 
-        var editedDescription by remember(latestTask.id) { mutableStateOf(latestTask.description) }
+        var editedDescription by remember(latestTask.id) { mutableStateOf(latestTask.description ?: "") }
         var editedName by remember(latestTask.id) { mutableStateOf(latestTask.name) }
 
         SheetToEditTask(
@@ -361,6 +342,42 @@ fun CalenderScreen(
     }
 
     Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    AnimatedContent(
+                        targetState = visibleMonth,
+                        label = "MonthAnimation"
+                    ) { month ->
+                        Text(
+                            text = month,
+                            style = MaterialTheme.typography.titleLarge.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        )
+                    }
+                },
+                actions = {
+                    AnimatedContent(
+                        targetState = visibleYear,
+                        label = "YearAnimation",
+                        transitionSpec = {
+                            fadeIn() togetherWith fadeOut()
+                        }
+                    ) { year ->
+                        Text(
+                            modifier = Modifier.padding(end = 16.dp),
+                            text = year.toString(),
+                            style = MaterialTheme.typography.titleLarge.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        )
+                    }
+                }
+            )
+        },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = {
@@ -382,7 +399,7 @@ fun CalenderScreen(
                     OutlinedButton(
                         onClick = {
                             showTime = false
-                            switchState =false
+                            switchState = false
                             timePickerState.hour = localTime.hour
                             timePickerState.minute = localTime.minute
                         }
@@ -422,80 +439,39 @@ fun CalenderScreen(
                 .padding(innerPadding),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            AnimatedContent(
-                modifier = modifier.animateContentSize(
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                        stiffness = Spring.StiffnessMedium
-                    )
+            HorizontalCalendar(
+                modifier = modifier.padding(
+                    horizontal = 8.dp
                 ),
-                targetState = selectedTab,
-                transitionSpec = {
-                    scaleIn(
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioLowBouncy,
-                            stiffness = Spring.StiffnessMediumLow
-                        )
-                    ) + fadeIn() togetherWith scaleOut(
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioLowBouncy,
-                            stiffness = Spring.StiffnessMediumLow
-                        )
-                    ) + fadeOut()
-                }
-            ) {
-                if (it == 0){
-                    WeekCalendar(
-                        modifier = modifier.padding(
-                            horizontal = 16.dp
-                        ),
-                        state = weekState,
-                        dayContent = { weekDate ->
-                            WeekCalender(
-                                weekDate = weekDate,
-                                selectedDate = currentSelectedDate,
-                                onClick = {
-                                    currentSelectedDate = it
-                                }
-                            )
-                        },
+                state = state,
+                reverseLayout = false,
+                dayContent = {
+                    MonthCalender(
+                        day = it,
+                        hapticFeedback = haptics,
+                        selectedDate = currentSelectedDate,
+                        onClick = { date ->
+                            currentSelectedDate = date
+                        }
                     )
-                } else if(it == 1){
-                    HorizontalCalendar(
-                        modifier = modifier.padding(
-                            horizontal = 8.dp
-                        ),
-                        state = state,
-                        reverseLayout = false,
-                        dayContent = {
-                            MonthCalender(
-                                day = it,
-                                hapticFeedback = haptics,
-                                selectedDate = currentSelectedDate,
-                                onClick = { date ->
-                                    currentSelectedDate = date
-                                }
-                            )
-                        },
-                        monthHeader = {
-                            MonthHeader(
-                                monthName = it.yearMonth.month.toString(),
-                                weekName = it.weekDays.first().map {
-                                    it.date.dayOfWeek.toString().take(3).lowercase()
-                                        .replaceFirstChar {
-                                            it.uppercase()
-                                        }
-                                },
-                                onClick = {
-                                    scope.launch {
-                                        state.animateScrollToMonth(currentMonth)
-                                    }
-                                }
-                            )
+                },
+                monthHeader = {
+                    MonthHeader(
+                        weekName = it.weekDays.first().map {
+                            it.date.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault())
                         }
                     )
                 }
-            }
+            )
+
+            // Clear visible line (divider) separating the calendar and the task list
+            HorizontalDivider(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 12.dp, horizontal = 16.dp),
+                thickness = 1.dp,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
+            )
 
             Column(
                 modifier = modifier.weight(1f)

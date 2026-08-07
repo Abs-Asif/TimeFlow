@@ -27,7 +27,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.dev.timeflow"
+        applicationId = "Asif.mobalisa.calender"
         minSdk = 27
         targetSdk = 36
         versionCode = 5

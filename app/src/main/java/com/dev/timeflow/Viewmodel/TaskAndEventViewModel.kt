@@ -447,7 +447,21 @@ class TaskAndEventViewModel @Inject constructor(
         return dataStoreRepo.readName()
     }
 
+    fun getCheckedPrayers(dateStr: String): Flow<Set<String>> {
+        return dataStoreRepo.getCheckedPrayers(dateStr)
+    }
 
+    fun togglePrayer(dateStr: String, prayer: String, isChecked: Boolean) {
+        viewModelScope.launch {
+            val current = dataStoreRepo.getCheckedPrayers(dateStr).first()
+            val updated = if (isChecked) {
+                current + prayer
+            } else {
+                current - prayer
+            }
+            dataStoreRepo.saveCheckedPrayers(dateStr, updated)
+        }
+    }
 }
 
 

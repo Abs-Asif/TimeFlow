@@ -65,38 +65,29 @@ fun SheetToAddEvent(
             // Date selection buttons
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Start Date
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Starts",
-                        style = MaterialTheme.typography.labelMedium,
-                        modifier = Modifier.padding(bottom = 4.dp)
-                    )
-                    OutlinedButton(
-                        onClick = { showStartDatePicker = true },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text(text = startDate.format(formatter))
-                    }
+                OutlinedButton(
+                    onClick = { showStartDatePicker = true },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(text = startDate.format(formatter))
                 }
 
-                // End Date
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Ends",
-                        style = MaterialTheme.typography.labelMedium,
-                        modifier = Modifier.padding(bottom = 4.dp)
-                    )
-                    OutlinedButton(
-                        onClick = { showEndDatePicker = true },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text(text = endDate.format(formatter))
-                    }
+                Text(
+                    text = "to",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                OutlinedButton(
+                    onClick = { showEndDatePicker = true },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(text = endDate.format(formatter))
                 }
             }
 

@@ -75,13 +75,15 @@ fun WeekCalender(
             fontSize = 15.sp,
             color = if (isFriday) Color.Red else MaterialTheme.colorScheme.onSurface,
             fontWeight = if (isFriday) FontWeight.Bold else FontWeight.Normal,
-            modifier = Modifier.padding(bottom = 2.dp)
+            modifier = Modifier
+                .height(20.dp)
+                .padding(bottom = 2.dp)
         )
 
         // 2. Date number box styled exactly like MonthCalender
         Box(
             modifier = Modifier
-                .aspectRatio(1f)
+                .height(40.dp)
                 .padding(start = 4.dp, top = 4.dp, end = 4.dp, bottom = 1.dp)
                 .clip(dayCellShape)
                 .border(

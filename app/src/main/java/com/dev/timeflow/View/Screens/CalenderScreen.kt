@@ -16,6 +16,13 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.isImeVisible
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -118,13 +125,14 @@ import java.util.Locale
 import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
+@OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun CalenderScreen(
     modifier: Modifier = Modifier
 ) {
     val haptics = LocalHapticFeedback.current
     val localContext = LocalContext.current
+    val focusManager = LocalFocusManager.current
     val taskViewModel: TaskAndEventViewModel = hiltViewModel()
 
     val permission = rememberPermissionState(
@@ -841,7 +849,9 @@ fun CalenderScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                    .padding(horizontal = 16.dp)
+                    .padding(top = 8.dp, bottom = if (WindowInsets.isImeVisible) 16.dp else 8.dp)
+                    .imePadding(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
@@ -891,6 +901,31 @@ fun CalenderScreen(
                                 color = MaterialTheme.colorScheme.onSurface
                             ),
                             singleLine = true,
+                            keyboardOptions = KeyboardOptions(
+                                imeAction = ImeAction.Done
+                            ),
+                            keyboardActions = KeyboardActions(
+                                onDone = {
+                                    if (taskName.isNotEmpty()) {
+                                        taskViewModel.insertTask(
+                                            tasks = Tasks(
+                                                id = 0,
+                                                name = taskName,
+                                                description = "",
+                                                notification = true,
+                                                importance = "Low",
+                                                taskTime = currentSelectedDate
+                                                    .atStartOfDay(ZoneId.systemDefault())
+                                                    .toInstant()
+                                                    .toEpochMilli(),
+                                                createdAt = currentSelectedDate.toMillis(localTime = LocalTime.now())
+                                            )
+                                        )
+                                        taskName = ""
+                                    }
+                                    focusManager.clearFocus()
+                                }
+                            ),
                             decorationBox = { innerTextField ->
                                 Box(
                                     contentAlignment = Alignment.CenterStart,
@@ -928,6 +963,7 @@ fun CalenderScreen(
                                         )
                                     )
                                     taskName = ""
+                                    focusManager.clearFocus()
                                 }
                             },
                             enabled = taskName.isNotEmpty()

@@ -82,7 +82,7 @@ fun MonthCalender(
     ) {
         Box(
             modifier = Modifier
-                .aspectRatio(1f)
+                .height(40.dp)
                 .padding(start = 4.dp, top = 4.dp, end = 4.dp, bottom = 1.dp)
                 .clip(dayCellShape)
                 .border(
@@ -175,7 +175,7 @@ fun MonthHeader(
         modifier = modifier.fillMaxWidth()
     ) {
         Row(
-            modifier = modifier
+            modifier = Modifier
                 .fillMaxWidth()
                 .padding(
                     bottom = 8.dp
@@ -184,7 +184,7 @@ fun MonthHeader(
             weekName.forEach {
                 val isFri = it == "Fri"
                 Text(
-                    modifier = modifier.weight(1f),
+                    modifier = Modifier.weight(1f),
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                     fontSize = 15.sp,
                     text = it,

@@ -6,9 +6,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -32,32 +31,28 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.composables.icons.lucide.Bell
 import com.composables.icons.lucide.Lucide
-import com.composables.icons.lucide.PenLine
 import com.composables.icons.lucide.Trash
 import com.dev.timeflow.Data.Model.Tasks
 import com.dev.timeflow.View.utils.toHour
 import com.dev.timeflow.View.utils.toMinute
 import kotlinx.coroutines.delay
-import kotlin.text.ifEmpty
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SheetToEditTask(
     modifier: Modifier = Modifier,
-    onDismiss :() -> Unit,
-    onCheckBoxValueChange :(Boolean) -> Unit,
+    onDismiss : () -> Unit,
+    onCheckBoxValueChange : (Boolean) -> Unit,
     onDeleteTask : () -> Unit,
     onValueChange : (String) -> Unit,
     onNameValueChange : (String) -> Unit,
     tasks: Tasks
 ) {
-    var description by remember(tasks.id) { mutableStateOf(tasks.description ?: "") }
-    var name by remember(tasks.id) {mutableStateOf(tasks.name) }
+    var name by remember(tasks.id) { mutableStateOf(tasks.name) }
     val localHapticFeedback = LocalHapticFeedback.current
     val baseFontSize = MaterialTheme.typography.headlineSmall.fontSize.value
     val minFontSize = 14.sp.value
@@ -71,146 +66,111 @@ fun SheetToEditTask(
     } else {
         baseFontSize
     }
-    LaunchedEffect(description) {
-        delay(500)
-        if (description != tasks.description) {
-            onValueChange(description)
-        }
-    }
 
     LaunchedEffect(name) {
-
         delay(500)
         if (name != tasks.name) {
-
             onNameValueChange.invoke(name)
         }
     }
 
     ModalBottomSheet(
         onDismissRequest = {
-          onDismiss.invoke()
+            onDismiss.invoke()
         }
     ) {
         Column(
             modifier = modifier.padding(
-             start = 16.dp, end = 16.dp, bottom = 26.dp
-
+                start = 16.dp, end = 16.dp, bottom = 26.dp
             )
         ) {
-           Row(modifier = modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-               NewCheckBox(
-                   isSelected = tasks.isCompleted
-               ) {
-                   localHapticFeedback.performHapticFeedback(
-                       hapticFeedbackType = HapticFeedbackType.Confirm
-                   )
-                   onCheckBoxValueChange(it)
-               }
-               TextField(
-                   modifier = modifier.weight(1f),
-                   colors = TextFieldDefaults.colors(
-                       disabledContainerColor = Color.Transparent,
-                       focusedContainerColor = Color.Transparent,
-                       unfocusedContainerColor = Color.Transparent,
-                       disabledIndicatorColor = Color.Transparent,
-                       focusedIndicatorColor = Color.Transparent,
-                       unfocusedIndicatorColor = Color.Transparent,
-                   ),
-                   value = name,
-                   textStyle = MaterialTheme.typography.headlineSmall.copy(
-                       fontSize = fontSize.sp
-                   ),
-                   onValueChange = {
-                       name = it
-                   }
-               )
-
-               IconButton(
-                   colors = IconButtonDefaults.iconButtonColors(
-                       containerColor = MaterialTheme.colorScheme.error,
-                       contentColor = MaterialTheme.colorScheme.onError
-                   ),
-                   onClick = {
-                       onDeleteTask()
-                       onDismiss.invoke()
-                   }
-               ) {
-                   Icon(
-                       modifier = modifier.size(
-                           ButtonDefaults.IconSize
-                       ),
-                       imageVector = Lucide.Trash,
-                       contentDescription = null
-                   )
-               }
-
-           }
-            TextField(
-                colors = TextFieldDefaults.colors(
-                    disabledContainerColor = Color.Transparent,
-                    focusedContainerColor = Color.Transparent,
-                    unfocusedContainerColor = Color.Transparent,
-                    disabledIndicatorColor = Color.Transparent,
-                    focusedIndicatorColor = Color.Transparent,
-                    unfocusedIndicatorColor = Color.Transparent,
-                ),
+            Row(
                 modifier = modifier.fillMaxWidth(),
-                value = description,
-                onValueChange = {
-                  description = it
-                },
-                placeholder = {
-                    tasks.description?.ifEmpty { "Enter description" }?.let { Text(text = it) }
-                },
-                label = {
-
-                    Text("Description")
-
-                },
-                keyboardOptions = KeyboardOptions(
-                    imeAction = ImeAction.Done
-                ),
-                keyboardActions = KeyboardActions(
-                    onDone = {
-                        onValueChange.invoke(description)
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                NewCheckBox(
+                    isSelected = tasks.isCompleted
+                ) {
+                    localHapticFeedback.performHapticFeedback(
+                        hapticFeedbackType = HapticFeedbackType.Confirm
+                    )
+                    onCheckBoxValueChange(it)
+                }
+                TextField(
+                    modifier = modifier.weight(1f),
+                    colors = TextFieldDefaults.colors(
+                        disabledContainerColor = Color.Transparent,
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent,
+                        disabledIndicatorColor = Color.Transparent,
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent,
+                    ),
+                    value = name,
+                    textStyle = MaterialTheme.typography.headlineSmall.copy(
+                        fontSize = fontSize.sp
+                    ),
+                    onValueChange = {
+                        name = it
                     }
-                ),
-                leadingIcon = {
+                )
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(
+                    colors = IconButtonDefaults.iconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.error,
+                        contentColor = MaterialTheme.colorScheme.onError
+                    ),
+                    onClick = {
+                        onDeleteTask()
+                        onDismiss.invoke()
+                    }
+                ) {
                     Icon(
-                        modifier = modifier.size(ButtonDefaults.IconSize),
-                        imageVector = Lucide.PenLine,
-                        contentDescription = ""
+                        modifier = modifier.size(
+                            ButtonDefaults.IconSize
+                        ),
+                        imageVector = Lucide.Trash,
+                        contentDescription = "Delete"
                     )
                 }
 
-            )
+                Spacer(modifier = Modifier.width(12.dp))
 
-            ListItem(
-                modifier = modifier.
-                padding(top = 8.dp).
-                clip(RoundedCornerShape(12.dp)),
-                tonalElevation = 10.dp,
-                overlineContent = {
-                    Text("notification time")
-                },
-                leadingContent = {
-                    Icon(
-                        modifier = modifier.size(ButtonDefaults.IconSize),
-                        imageVector = Lucide.Bell,
-                        contentDescription = ""
-                    )
-                }, headlineContent = {
-                   if (tasks.notification){
-                       Text(
-                           text = "${tasks.taskTime?.toHour()}:${tasks.taskTime?.toMinute()}"
-                       )
-                   } else {
-                       Text(
-                           text = "no notification"
-                       )
-                   }
-                })
+                ListItem(
+                    modifier = modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(12.dp)),
+                    tonalElevation = 10.dp,
+                    overlineContent = {
+                        Text("notification time")
+                    },
+                    leadingContent = {
+                        Icon(
+                            modifier = modifier.size(ButtonDefaults.IconSize),
+                            imageVector = Lucide.Bell,
+                            contentDescription = ""
+                        )
+                    },
+                    headlineContent = {
+                        if (tasks.notification) {
+                            Text(
+                                text = "${tasks.taskTime?.toHour()}:${tasks.taskTime?.toMinute()}"
+                            )
+                        } else {
+                            Text(
+                                text = "no notification"
+                            )
+                        }
+                    }
+                )
+            }
         }
     }
 }

@@ -31,9 +31,4 @@ sealed interface Routes {
     data object PrivacyScreen : Routes{
         override val route = "privacy_screen"
     }
-
-    @Serializable
-    data object AboutScreen : Routes{
-        override val route = "about_screen"
-    }
 }

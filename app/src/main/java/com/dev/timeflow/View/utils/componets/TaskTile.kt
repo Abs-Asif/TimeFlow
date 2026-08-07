@@ -3,22 +3,14 @@ package com.dev.timeflow.View.utils.componets
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Circle
-import androidx.compose.material3.AssistChipDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -28,9 +20,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
@@ -48,7 +40,6 @@ fun TaskTile(
     onUpdateTask: (Boolean) -> Unit,
     onClick : () -> Unit
 ) {
-
     var animate by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val scale by animateFloatAsState(
@@ -56,7 +47,8 @@ fun TaskTile(
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioLowBouncy,
             stiffness = Spring.StiffnessLow
-        )
+        ),
+        label = "TileScale"
     )
     Column(
         modifier = modifier
@@ -67,7 +59,6 @@ fun TaskTile(
             .clip(
                 RoundedCornerShape(16.dp)
             )
-
             .clickable(
                 onClick = {
                     onClick.invoke()
@@ -78,89 +69,34 @@ fun TaskTile(
             ),
     ) {
         Row(
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.Top,
+            modifier = Modifier.padding(vertical = 4.dp)
         ) {
             NewCheckBox(
                 isSelected = taskIsCompleted
             ) {
-                scope.launch{
+                scope.launch {
                     animate = true
                     delay(200)
                     animate = false
                 }
-                onUpdateTask.invoke(
-                    it
-                )
-
+                onUpdateTask.invoke(it)
             }
+
+            Spacer(modifier = Modifier.width(12.dp))
 
             Text(
                 modifier = modifier
                     .weight(1f)
                     .padding(
-                        end = 4.dp
+                        end = 4.dp,
+                        top = 8.dp // align nicely with the top-aligned checkbox
                     ),
                 text = taskName,
                 textDecoration = if (taskIsCompleted) TextDecoration.LineThrough else TextDecoration.None,
-                fontWeight =  FontWeight.Normal
+                fontWeight = FontWeight.Normal,
+                textAlign = TextAlign.Justify
             )
-
-            Box(
-                modifier = modifier.padding(
-                    end = 8.dp
-                )
-            ){
-                Row(
-                    modifier = modifier
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(
-                            when (taskImportance) {
-                                "Low" -> Color(0xFF4CAF50).copy(alpha = 0.3f)
-                                "Medium" -> Color(0xFFFFC107).copy(alpha = 0.3f)
-                                "High" -> Color(0xFFF44336).copy(alpha = 0.3f)
-                                else -> Color.Transparent
-                            }
-                        )
-                    ,
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(2.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Circle,
-                        tint = when (taskImportance) {
-                            "Low" -> Color(0xFF4CAF50)
-                            "Medium" -> Color(0xFFFFC107)
-                            "High" -> Color(0xFFF44336)
-                            else -> Color.Transparent
-                        },
-                        contentDescription = null,
-                        modifier = modifier
-                            .size(
-                                AssistChipDefaults.IconSize - 4.dp
-                            )
-                            .padding(
-                                start = 6.dp
-                            )
-                    )
-                    Text(
-                        modifier = modifier.padding(end = 6.dp),
-                        text = taskImportance,
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontWeight = when (taskImportance) {
-                                "Low" -> FontWeight.Light
-                                "Medium" -> FontWeight.Medium
-                                "High" -> FontWeight.SemiBold
-                                else -> FontWeight.Normal
-                            }
-                        )
-                    )
-                }
-            }
-
-       }
-
-
-   }
-
+        }
+    }
 }
-

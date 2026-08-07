@@ -22,20 +22,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.DatePickerState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TimePickerState
@@ -43,10 +37,8 @@ import androidx.compose.material3.ToggleButton
 import androidx.compose.material3.ToggleButtonDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -56,17 +48,12 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.composables.icons.lucide.Bell
-import com.composables.icons.lucide.FlagTriangleRight
 import com.composables.icons.lucide.Lucide
-import com.composables.icons.lucide.Notebook
 import com.composables.icons.lucide.Signature
 import com.dev.timeflow.Data.Model.ImportanceChipModel
 import com.dev.timeflow.Data.Model.SavingModel
-import com.dev.timeflow.View.utils.toLocalDate
-import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
-
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -103,12 +90,11 @@ fun SheetToAddEventAndTask(
     selectedImportantChip : Int,
 ) {
     val localContext = LocalContext.current
-    val primary = MaterialTheme.colorScheme.primary
 
     ModalBottomSheet(
-      sheetState = rememberModalBottomSheetState(
-          skipPartiallyExpanded = true
-      ),
+        sheetState = rememberModalBottomSheetState(
+            skipPartiallyExpanded = true
+        ),
         onDismissRequest = {
             onDismiss.invoke()
         }
@@ -131,13 +117,11 @@ fun SheetToAddEventAndTask(
                         it
                     )
                     if (it) {
-                        // for a13 and a13 + devices
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                             val hasPermission = ContextCompat.checkSelfPermission(
                                     localContext,
                                     Manifest.permission.POST_NOTIFICATIONS
                                 ) == PackageManager.PERMISSION_GRANTED
-                            // if permission is denied
                             if (!hasPermission) {
                                 onSwitchState.invoke(false)
                                 onTimeState.invoke(false)
@@ -148,17 +132,14 @@ fun SheetToAddEventAndTask(
                                 ).show()
                                 onPermissionState.invoke(true)
                             } else {
-                                // if permission is granted we are showing the picker
                                 onTimeState.invoke(
                                     true
                                 )
                             }
                         } else {
-                            // for devices below a13
                             onTimeState.invoke(true)
                         }
                     } else {
-                        // picker will never show cuz we are passing false
                         onTimeState.invoke(false)
                     }
 
@@ -203,43 +184,7 @@ fun SheetToAddEventAndTask(
                 },
                 maxLines = 1,
                 keyboardOptions = KeyboardOptions(
-                    imeAction = ImeAction.Next
-                )
-            )
-            Spacer(
-                modifier = modifier.height(
-                    8.dp
-                )
-            )
-            TextField(
-                colors = TextFieldDefaults.colors(
-                    focusedContainerColor = Color.Transparent,
-                    unfocusedContainerColor = Color.Transparent
-                ),
-                modifier = modifier.fillMaxWidth(),
-                value = taskDescription,
-                onValueChange = {
-                    onTaskDescriptionChange.invoke(it)
-                },
-                leadingIcon = {
-                    Icon(
-                        imageVector = Lucide.Notebook,
-                        contentDescription = null,
-                    )
-                },
-                placeholder = {
-                    Text(
-                        text = "Description(optional)"
-                    )
-                },
-                maxLines = 1,
-                keyboardOptions = KeyboardOptions(
                     imeAction = ImeAction.Done
-                ),
-                keyboardActions = KeyboardActions(
-                    onDone = {
-
-                    }
                 )
             )
 
@@ -247,59 +192,13 @@ fun SheetToAddEventAndTask(
                 modifier = modifier.height(8.dp)
             )
 
-            Column {
-                Text(
-                    text = "Priority",
-                    style = MaterialTheme.typography.labelLarge.copy(
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                )
-                Row (
-                    modifier = modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Start
-                ){
-                    importanceChip.forEachIndexed {
-                            index , chip ->
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            FilterChip(
-                                modifier = modifier.padding(
-                                    end = 4.dp
-                                ),
-                                selected = selectedImportantChip == index,
-                                onClick = {
-                                    onSelectedImportantChipChange.invoke(index)
-                                    hapticFeedback.performHapticFeedback(
-                                        hapticFeedbackType = HapticFeedbackType.Confirm
-                                    )
-                                },
-                                label = {
-                                    Text(
-                                        text = chip.label
-                                    )
-                                },
-                                leadingIcon = {
-                                    Icon(
-                                        modifier = modifier.size(
-                                            FilterChipDefaults.IconSize
-                                        ),
-                                        imageVector = Lucide.FlagTriangleRight,
-                                        contentDescription = null,
-                                        tint = chip.color
-                                    )
-                                }
-                            )
-                        }
-                    }
-                }
-            }
-
             AnimatedContent(
-                targetState = switchState, transitionSpec = {
+                targetState = switchState,
+                transitionSpec = {
                     scaleIn() togetherWith scaleOut()
-                }) {
+                },
+                label = "SwitchStateAnimation"
+            ) {
                 if (it) {
                     Button(
                         modifier = modifier.fillMaxWidth(),

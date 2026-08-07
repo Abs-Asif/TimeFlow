@@ -12,6 +12,9 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -53,6 +56,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
@@ -69,18 +73,27 @@ import androidx.compose.material3.Surface
 import com.dev.timeflow.Data.Model.ImportanceChipModel
 import com.dev.timeflow.Data.Model.SavingModel
 import com.dev.timeflow.Data.Model.Tasks
+import com.dev.timeflow.Data.Model.Events
 import com.dev.timeflow.R
 import com.dev.timeflow.View.Screens.calenderScreen.MonthCalender
 import com.dev.timeflow.View.Screens.calenderScreen.MonthHeader
+import com.dev.timeflow.View.Screens.calenderScreen.WeekCalender
 import com.dev.timeflow.View.utils.componets.SheetToAddEventAndTask
 import com.dev.timeflow.View.utils.componets.SheetToEditTask
+import com.dev.timeflow.View.utils.componets.SheetToAddEvent
+import com.dev.timeflow.View.utils.componets.SheetToEditEvent
+import com.dev.timeflow.View.utils.componets.MonthYearPickerDialog
+import com.dev.timeflow.View.utils.componets.RoundedFabMenu
 import com.dev.timeflow.View.utils.componets.TaskTile
 import com.dev.timeflow.View.utils.endOfDayMillis
 import com.dev.timeflow.View.utils.toDateTimeInMillis
 import com.dev.timeflow.View.utils.toMillis
+import com.dev.timeflow.View.utils.toLocalDate
 import com.dev.timeflow.Viewmodel.TaskAndEventViewModel
 import com.kizitonwose.calendar.compose.HorizontalCalendar
+import com.kizitonwose.calendar.compose.WeekCalendar
 import com.kizitonwose.calendar.compose.rememberCalendarState
+import com.kizitonwose.calendar.compose.weekcalendar.rememberWeekCalendarState
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.YearMonth
@@ -91,6 +104,8 @@ import com.google.accompanist.permissions.rememberPermissionState
 import java.time.format.TextStyle
 import java.util.Calendar
 import java.util.Locale
+import java.time.format.DateTimeFormatter
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
 @Composable
@@ -137,6 +152,18 @@ fun CalenderScreen(
     // Variable to hold state of the bottom sheet
     var showBottomSheet by rememberSaveable { mutableStateOf(false) }
 
+    // State for showing Event creation sheet
+    var showEventBottomSheet by rememberSaveable { mutableStateOf(false) }
+
+    // State for showing Event edit sheet
+    var showEventDetails by rememberSaveable { mutableStateOf(false) }
+
+    // State for showing Jump to Date picker
+    var showJumpToDatePicker by rememberSaveable { mutableStateOf(false) }
+
+    // State to toggle Week/Month view mode
+    var isWeekMode by rememberSaveable { mutableStateOf(false) }
+
     // Var to hold state of the task name textfield
     var taskName by rememberSaveable { mutableStateOf("") }
 
@@ -174,7 +201,10 @@ fun CalenderScreen(
     }
 
     val tasksForDate by taskViewModel.taskForDate.collectAsState(emptyList())
+    val eventsForDate by taskViewModel.eventsForDate.collectAsState(emptyList())
+    val allEvents by taskViewModel.allEvents.collectAsState(emptyList())
     val currentTask by taskViewModel.currentTask.collectAsState(null)
+    val currentEvent by taskViewModel.currentEvent.collectAsState(null)
 
     val presetEvents = remember(currentSelectedDate) {
         val month = currentSelectedDate.monthValue
@@ -304,6 +334,29 @@ fun CalenderScreen(
         )
     }
 
+    if (showEventBottomSheet) {
+        SheetToAddEvent(
+            initialDate = currentSelectedDate,
+            onDismiss = { showEventBottomSheet = false },
+            onSaveEvent = { name, start, end ->
+                val color = taskViewModel.getUniqueColorForRange(
+                    start.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli(),
+                    end.endOfDayMillis()
+                )
+                taskViewModel.insertEvent(
+                    Events(
+                        name = name,
+                        startDate = start.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli(),
+                        endDate = end.endOfDayMillis(),
+                        colorHex = color,
+                        notification = true,
+                        createdAt = System.currentTimeMillis()
+                    )
+                )
+            }
+        )
+    }
+
     if (showTaskDetails && currentTask != null) {
         val latestTask = tasksForDate.find { it.id == currentTask!!.id } ?: currentTask!!
 
@@ -320,6 +373,57 @@ fun CalenderScreen(
                 taskViewModel.updateTask(
                     latestTask.copy(name = newName)
                 )
+            }
+        )
+    }
+
+    if (showEventDetails && currentEvent != null) {
+        val latestEvent = allEvents.find { it.id == currentEvent!!.id } ?: currentEvent!!
+
+        SheetToEditEvent(
+            event = latestEvent,
+            onDismiss = {
+                showEventDetails = false
+                taskViewModel.clearEvent()
+            },
+            onDeleteEvent = {
+                taskViewModel.deleteEvent(latestEvent)
+            },
+            onSaveEvent = { newName, start, end ->
+                val color = if (start.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli() == latestEvent.startDate &&
+                    end.endOfDayMillis() == latestEvent.endDate) {
+                    latestEvent.colorHex
+                } else {
+                    taskViewModel.getUniqueColorForRange(
+                        start.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli(),
+                        end.endOfDayMillis()
+                    )
+                }
+                taskViewModel.updateEvent(
+                    latestEvent.copy(
+                        name = newName,
+                        startDate = start.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli(),
+                        endDate = end.endOfDayMillis(),
+                        colorHex = color
+                    )
+                )
+            }
+        )
+    }
+
+    if (showJumpToDatePicker) {
+        MonthYearPickerDialog(
+            initialMonth = currentSelectedDate.month,
+            initialYear = currentSelectedDate.year,
+            onDismiss = { showJumpToDatePicker = false },
+            onConfirm = { month, year ->
+                val length = java.time.YearMonth.of(year, month).lengthOfMonth()
+                val targetDay = currentSelectedDate.dayOfMonth.coerceIn(1, length)
+                currentSelectedDate = LocalDate.of(year, month, targetDay)
+                scope.launch {
+                    state.scrollToMonth(YearMonth.of(year, month))
+                }
+                showJumpToDatePicker = false
             }
         )
     }
@@ -362,13 +466,24 @@ fun CalenderScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = {
-                    showBottomSheet = !showBottomSheet
+            RoundedFabMenu(
+                todayDate = currentDate,
+                onBackToToday = {
+                    currentSelectedDate = currentDate
+                    scope.launch {
+                        state.scrollToMonth(YearMonth.from(currentDate))
+                    }
+                },
+                onJumpToDate = {
+                    showJumpToDatePicker = true
+                },
+                onCreateTask = {
+                    showBottomSheet = true
+                },
+                onCreateEvent = {
+                    showEventBottomSheet = true
                 }
-            ) {
-                Icon(imageVector = Lucide.Plus, contentDescription = null)
-            }
+            )
         },
     ) { innerPadding ->
         if (showTime) {
@@ -416,36 +531,122 @@ fun CalenderScreen(
             )
         }
 
+        // Vertical swipe gesture to shrink calendar to week view or expand to month view
+        var verticalDrag by remember { mutableStateOf(0f) }
+        val verticalSwipeModifier = Modifier.pointerInput(Unit) {
+            detectVerticalDragGestures(
+                onDragEnd = { verticalDrag = 0f },
+                onDragCancel = { verticalDrag = 0f },
+                onVerticalDrag = { change, dragAmount ->
+                    change.consume()
+                    verticalDrag += dragAmount
+                    if (verticalDrag < -80f) {
+                        isWeekMode = true
+                        verticalDrag = 0f
+                    } else if (verticalDrag > 80f) {
+                        isWeekMode = false
+                        verticalDrag = 0f
+                    }
+                }
+            )
+        }
+
+        // Horizontal swipe gesture below calendar to navigate days forward/backward
+        var horizontalDrag by remember { mutableStateOf(0f) }
+        val horizontalSwipeModifier = Modifier.pointerInput(Unit) {
+            detectHorizontalDragGestures(
+                onDragEnd = { horizontalDrag = 0f },
+                onDragCancel = { horizontalDrag = 0f },
+                onHorizontalDrag = { change, dragAmount ->
+                    change.consume()
+                    horizontalDrag += dragAmount
+                    if (horizontalDrag > 80f) {
+                        currentSelectedDate = currentSelectedDate.minusDays(1)
+                        horizontalDrag = 0f
+                    } else if (horizontalDrag < -80f) {
+                        currentSelectedDate = currentSelectedDate.plusDays(1)
+                        horizontalDrag = 0f
+                    }
+                }
+            )
+        }
+
         Column(
             modifier = modifier
                 .fillMaxSize()
                 .padding(innerPadding),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            HorizontalCalendar(
-                modifier = modifier.padding(
-                    horizontal = 8.dp
-                ),
-                state = state,
-                reverseLayout = false,
-                dayContent = {
-                    MonthCalender(
-                        day = it,
-                        hapticFeedback = haptics,
-                        selectedDate = currentSelectedDate,
-                        onClick = { date ->
-                            currentSelectedDate = date
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(verticalSwipeModifier)
+            ) {
+                AnimatedContent(
+                    targetState = isWeekMode,
+                    label = "CalendarViewMode"
+                ) { weekMode ->
+                    if (weekMode) {
+                        val weekState = rememberWeekCalendarState(
+                            startDate = startMonth.atDay(1),
+                            endDate = endMonth.atEndOfMonth(),
+                            firstVisibleWeekDate = currentSelectedDate,
+                            firstDayOfWeek = firstDayOfWeek
+                        )
+                        LaunchedEffect(currentSelectedDate) {
+                            weekState.scrollToWeek(currentSelectedDate)
                         }
-                    )
-                },
-                monthHeader = {
-                    MonthHeader(
-                        weekName = it.weekDays.first().map {
-                            it.date.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault())
-                        }
-                    )
+                        WeekCalendar(
+                            modifier = modifier.padding(horizontal = 8.dp),
+                            state = weekState,
+                            dayContent = { weekDay ->
+                                val cellDate = weekDay.date
+                                val cellActiveEvents = allEvents.filter { event ->
+                                    val dateStart = event.startDate.toLocalDate()
+                                    val dateEnd = event.endDate.toLocalDate()
+                                    !cellDate.isBefore(dateStart) && !cellDate.isAfter(dateEnd)
+                                }
+                                WeekCalender(
+                                    selectedDate = currentSelectedDate,
+                                    onClick = { currentSelectedDate = it },
+                                    weekDate = weekDay,
+                                    activeEvents = cellActiveEvents
+                                )
+                            }
+                        )
+                    } else {
+                        HorizontalCalendar(
+                            modifier = modifier.padding(horizontal = 8.dp),
+                            state = state,
+                            reverseLayout = false,
+                            dayContent = { day ->
+                                val cellDate = day.date
+                                val cellActiveEvents = allEvents.filter { event ->
+                                    val dateStart = event.startDate.toLocalDate()
+                                    val dateEnd = event.endDate.toLocalDate()
+                                    !cellDate.isBefore(dateStart) && !cellDate.isAfter(dateEnd)
+                                }
+                                MonthCalender(
+                                    day = day,
+                                    hapticFeedback = haptics,
+                                    selectedDate = currentSelectedDate,
+                                    activeEvents = cellActiveEvents,
+                                    onClick = { date ->
+                                        currentSelectedDate = date
+                                    }
+                                )
+                            },
+                            monthHeader = {
+                                MonthHeader(
+                                    weekName = it.weekDays.first().map {
+                                        it.date.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault())
+                                    }
+                                )
+                            }
+                        )
+                    }
                 }
-            )
+            }
 
             // Clear visible line (divider) separating the calendar and the task list
             HorizontalDivider(
@@ -457,12 +658,14 @@ fun CalenderScreen(
             )
 
             Column(
-                modifier = modifier.weight(1f)
+                modifier = modifier
+                    .weight(1f)
+                    .then(horizontalSwipeModifier)
             ) {
                 AnimatedContent(
                     modifier = modifier
                         .align(Alignment.CenterHorizontally),
-                    targetState = tasksForDate.isNotEmpty() || presetEvents.isNotEmpty()
+                    targetState = tasksForDate.isNotEmpty() || eventsForDate.isNotEmpty() || presetEvents.isNotEmpty()
                 ) { hasContent ->
                     if (hasContent) {
                         Column(
@@ -475,6 +678,19 @@ fun CalenderScreen(
                             ) {
                                 items(presetEvents) { eventName ->
                                     PresetEventTile(eventName = eventName)
+                                }
+                                // Render Events ALWAYS on top of Tasks
+                                items(eventsForDate) { event ->
+                                    EventTile(
+                                        eventName = event.name,
+                                        startDateStr = event.startDate.toLocalDate().format(DateTimeFormatter.ofPattern("dd MMM yyyy")),
+                                        endDateStr = event.endDate.toLocalDate().format(DateTimeFormatter.ofPattern("dd MMM yyyy")),
+                                        colorHex = event.colorHex,
+                                        onClick = {
+                                            taskViewModel.selectEvent(event)
+                                            showEventDetails = true
+                                        }
+                                    )
                                 }
                                 items(tasksForDate){ task ->
                                     TaskTile(
@@ -552,6 +768,57 @@ fun PresetEventTile(
                     color = MaterialTheme.colorScheme.onSecondaryContainer
                 )
             )
+        }
+    }
+}
+
+@Composable
+fun EventTile(
+    modifier: Modifier = Modifier,
+    eventName: String,
+    startDateStr: String,
+    endDateStr: String,
+    colorHex: String,
+    onClick: () -> Unit
+) {
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp)
+            .clickable { onClick() },
+        color = Color(android.graphics.Color.parseColor(colorHex)).copy(alpha = 0.15f),
+        shape = RoundedCornerShape(12.dp),
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            Color(android.graphics.Color.parseColor(colorHex))
+        )
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Lucide.Calendar,
+                contentDescription = null,
+                tint = Color(android.graphics.Color.parseColor(colorHex)),
+                modifier = Modifier.size(24.dp)
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = eventName,
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                )
+                Text(
+                    text = "$startDateStr - $endDateStr",
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                )
+            }
         }
     }
 }

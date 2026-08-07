@@ -8,6 +8,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import androidx.datastore.preferences.preferencesDataStoreFile
 import androidx.room.Room
 import com.dev.timeflow.Data.Dao.TaskDao
+import com.dev.timeflow.Data.Dao.EventDao
 import com.dev.timeflow.Data.Repo.DataStoreRepo
 import com.dev.timeflow.Data.TaskDatabase
 import dagger.Module
@@ -42,7 +43,9 @@ class TimeFlowModule (
             context,
             TaskDatabase::class.java,
             "task_db"
-        ).build()
+        )
+        .fallbackToDestructiveMigration()
+        .build()
     }
 
     // provide the task dao
@@ -52,6 +55,15 @@ class TimeFlowModule (
         taskDatabase: TaskDatabase
     ) : TaskDao{
         return taskDatabase.taskDao()
+    }
+
+    // provide the event dao
+    @Singleton
+    @Provides
+    fun provideEventDao(
+        taskDatabase: TaskDatabase
+    ) : EventDao{
+        return taskDatabase.eventDao()
     }
 
     // provide the datastore prefrences

@@ -9,8 +9,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dev.timeflow.Data.Model.NotificationAlarmManagerModel
 import com.dev.timeflow.Data.Model.Tasks
+import com.dev.timeflow.Data.Model.Events
 import com.dev.timeflow.Data.Repo.DataStoreRepo
 import com.dev.timeflow.Data.Repo.TaskRepo
+import com.dev.timeflow.Data.Repo.EventRepo
 import com.dev.timeflow.Managers.notification.TimeFlowAlarmManagerService
 import com.dev.timeflow.View.Navigation.Routes
 import com.dev.timeflow.View.utils.toHour
@@ -33,7 +35,8 @@ import javax.inject.Inject
 class TaskAndEventViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val dataStoreRepo: DataStoreRepo,
-    private val taskRepo: TaskRepo
+    private val taskRepo: TaskRepo,
+    private val eventRepo: EventRepo
 ) : ViewModel(){
 
     private val _isLoading: MutableState<Boolean> = mutableStateOf(true)
@@ -57,12 +60,13 @@ class TaskAndEventViewModel @Inject constructor(
             _isLoading.value = false
 
             getAllTasks()
+            getAllEvents()
         }
     }
 
     // job to track and cancel the task fetch operation
     private var taskJob: Job? = null
-
+    private var eventJob: Job? = null
 
     private val _currentTask = MutableStateFlow<Tasks?>(null)
     var currentTask = _currentTask
@@ -74,6 +78,17 @@ class TaskAndEventViewModel @Inject constructor(
 
     fun clearTask (){
         _currentTask.value = null
+    }
+
+    private val _currentEvent = MutableStateFlow<Events?>(null)
+    var currentEvent = _currentEvent
+
+    fun selectEvent (events: Events){
+        _currentEvent.value = events
+    }
+
+    fun clearEvent (){
+        _currentEvent.value = null
     }
 
 
@@ -93,6 +108,18 @@ class TaskAndEventViewModel @Inject constructor(
             val tasks = taskRepo.getAllTasks()
             tasks.collect {
                 _allTasks.value = it
+            }
+        }
+    }
+
+    // variable to hold all the events in the database
+    private val _allEvents = MutableStateFlow<List<Events>>(emptyList())
+    var allEvents : StateFlow<List<Events>> = _allEvents
+
+    fun getAllEvents() {
+        viewModelScope.launch {
+            eventRepo.getAllEvents().collect {
+                _allEvents.value = it
             }
         }
     }
@@ -173,20 +200,32 @@ class TaskAndEventViewModel @Inject constructor(
     private var  _taskForDate = MutableStateFlow<List<Tasks>>(emptyList())
     var taskForDate : StateFlow<List<Tasks>> = _taskForDate
 
+    private var _eventsForDate = MutableStateFlow<List<Events>>(emptyList())
+    var eventsForDate : StateFlow<List<Events>> = _eventsForDate
+
     // function to get tasks for a date
     fun getTasksForADate(start : Long, end : Long) {
 
         //cancelling existing task fetch
         taskJob?.cancel()
+        eventJob?.cancel()
 
         _taskForDate.value = emptyList()
-
+        _eventsForDate.value = emptyList()
 
         taskJob =  viewModelScope.launch {
             taskRepo.getTasksForADate(
               start = start, end = end
             ).collect {
                 _taskForDate.value = it
+            }
+        }
+
+        eventJob = viewModelScope.launch {
+            eventRepo.getEventsForRange(
+                start = start, end = end
+            ).collect {
+                _eventsForDate.value = it
             }
         }
     }
@@ -214,7 +253,104 @@ class TaskAndEventViewModel @Inject constructor(
        }
     }
 
+    fun insertEvent(event: Events){
+        viewModelScope.launch(Dispatchers.IO) {
+            val generatedId = eventRepo.insertEvent(event)
+            if (event.notification) {
+                val eventDate = event.startDate.toLocalDate()
 
+                // 1. Alarm for 12:00 AM
+                scheduleNotification(
+                    notificationAlarmManagerModel = NotificationAlarmManagerModel(
+                        id = generatedId,
+                        type = 0,
+                        startTime = event.startDate,
+                        endTime = event.endDate,
+                        hour = 0,
+                        minute = 0,
+                        title = event.name,
+                        localDate = eventDate
+                    )
+                )
+
+                // 2. Alarm for 7:00 AM
+                scheduleNotification(
+                    notificationAlarmManagerModel = NotificationAlarmManagerModel(
+                        id = generatedId,
+                        type = 0,
+                        startTime = event.startDate,
+                        endTime = event.endDate,
+                        hour = 7,
+                        minute = 0,
+                        title = event.name,
+                        localDate = eventDate
+                    )
+                )
+            }
+        }
+    }
+
+    fun updateEvent(event: Events){
+        viewModelScope.launch(Dispatchers.IO) {
+            eventRepo.updateEvent(event)
+            if (event.notification) {
+                val eventDate = event.startDate.toLocalDate()
+
+                // 1. Alarm for 12:00 AM
+                scheduleNotification(
+                    notificationAlarmManagerModel = NotificationAlarmManagerModel(
+                        id = event.id,
+                        type = 0,
+                        startTime = event.startDate,
+                        endTime = event.endDate,
+                        hour = 0,
+                        minute = 0,
+                        title = event.name,
+                        localDate = eventDate
+                    )
+                )
+
+                // 2. Alarm for 7:00 AM
+                scheduleNotification(
+                    notificationAlarmManagerModel = NotificationAlarmManagerModel(
+                        id = event.id,
+                        type = 0,
+                        startTime = event.startDate,
+                        endTime = event.endDate,
+                        hour = 7,
+                        minute = 0,
+                        title = event.name,
+                        localDate = eventDate
+                    )
+                )
+            }
+        }
+    }
+
+    fun deleteEvent(event: Events){
+        viewModelScope.launch(Dispatchers.IO) {
+            eventRepo.deleteEvent(event)
+        }
+    }
+
+    private val pleasantColors = listOf(
+        "#E57373", "#F06292", "#BA68C8", "#9575CD", "#7986CB",
+        "#64B5F6", "#4FC3F7", "#4DD0E1", "#4DB6AC", "#81C784",
+        "#AED581", "#D4E157", "#FFD54F", "#FFB74D", "#FF8A65"
+    )
+
+    fun getUniqueColorForRange(startDate: Long, endDate: Long): String {
+        val overlappingEvents = _allEvents.value.filter {
+            it.startDate <= endDate && it.endDate >= startDate
+        }
+        val usedColors = overlappingEvents.map { it.colorHex.uppercase() }.toSet()
+        for (color in pleasantColors) {
+            if (color.uppercase() !in usedColors) {
+                return color
+            }
+        }
+        return pleasantColors.random()
+    }
 
     fun scheduleNotification (notificationAlarmManagerModel: NotificationAlarmManagerModel){
         viewModelScope.launch {

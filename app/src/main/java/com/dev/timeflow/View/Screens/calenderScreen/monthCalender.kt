@@ -12,7 +12,9 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -28,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kizitonwose.calendar.core.CalendarDay
 import com.kizitonwose.calendar.core.DayPosition
+import com.dev.timeflow.Data.Model.Events
 import java.time.LocalDate
 
 @Composable
@@ -36,6 +39,7 @@ fun MonthCalender(
     modifier: Modifier = Modifier,
     hapticFeedback: HapticFeedback,
     selectedDate : LocalDate,
+    activeEvents : List<Events> = emptyList(),
     onClick : (LocalDate) -> Unit
 ) {
     val date = LocalDate.now()
@@ -62,16 +66,22 @@ fun MonthCalender(
         label = "BoxTextColor"
     )
 
-    Column {
+    // Using circular-square (more square, rounded corner) Shape: RoundedCornerShape(10.dp)
+    val dayCellShape = RoundedCornerShape(10.dp)
+
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
         Box(
-            modifier = modifier
+            modifier = Modifier
                 .aspectRatio(1f)
                 .padding(4.dp)
-                .clip(CircleShape)
+                .clip(dayCellShape)
                 .border(
                     width = if (isToday) 1.5.dp else 0.dp,
                     color = if (isToday) MaterialTheme.colorScheme.primary else Color.Transparent,
-                    shape = CircleShape
+                    shape = dayCellShape
                 )
                 .background(
                     boxSelectedColor
@@ -89,16 +99,39 @@ fun MonthCalender(
             contentAlignment = Alignment.Center
         ) {
             Column(
-                modifier = modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    modifier = modifier.padding(0.dp),
+                    modifier = Modifier.padding(0.dp),
                     text = day.date.dayOfMonth.toString(),
                     fontWeight = if (isSelected || isToday) FontWeight.Bold else FontWeight.Normal,
                     color = boxTextColor
                 )
+            }
+        }
+
+        if (activeEvents.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(2.dp))
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 6.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                activeEvents.forEach { event ->
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(3.dp)
+                            .background(
+                                color = Color(android.graphics.Color.parseColor(event.colorHex)),
+                                shape = RoundedCornerShape(1.5.dp)
+                            )
+                    )
+                }
             }
         }
     }

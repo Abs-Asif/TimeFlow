@@ -51,13 +51,18 @@ fun MonthCalender(
     val isFriday = day.date.dayOfWeek == java.time.DayOfWeek.FRIDAY
 
     val boxSelectedColor by animateColorAsState(
-        targetValue = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+        targetValue = when {
+            isSelected && dayPosition -> MaterialTheme.colorScheme.primary
+            isSelected && !dayPosition -> MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+            else -> Color.Transparent
+        },
         label = "BoxSelectedColor"
     )
 
     val boxTextColor by animateColorAsState(
         targetValue = when {
-            isSelected -> MaterialTheme.colorScheme.onPrimary
+            isSelected && dayPosition -> MaterialTheme.colorScheme.onPrimary
+            isSelected && !dayPosition -> MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
             isToday -> MaterialTheme.colorScheme.primary
             isFriday -> Color.Red
             dayPosition -> MaterialTheme.colorScheme.onSurface

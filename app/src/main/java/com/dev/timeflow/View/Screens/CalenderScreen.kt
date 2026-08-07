@@ -15,6 +15,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -66,8 +67,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil3.compose.AsyncImage
@@ -558,6 +562,10 @@ fun CalenderScreen(
                         modifier = Modifier.padding(end = 8.dp),
                         onClick = {
                             currentSelectedDate = currentDate
+                            scope.launch {
+                                state.scrollToMonth(YearMonth.from(currentDate))
+                                weekState.scrollToWeek(currentDate)
+                            }
                         }
                     ) {
                         Icon(
@@ -873,20 +881,31 @@ fun CalenderScreen(
                             .padding(horizontal = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        TextField(
+                        BasicTextField(
                             value = taskName,
                             onValueChange = { taskName = it },
-                            placeholder = { Text("Type your task here ", style = MaterialTheme.typography.bodyMedium) },
-                            modifier = Modifier.weight(1f),
-                            textStyle = MaterialTheme.typography.bodyMedium,
-                            colors = TextFieldDefaults.colors(
-                                focusedContainerColor = Color.Transparent,
-                                unfocusedContainerColor = Color.Transparent,
-                                disabledContainerColor = Color.Transparent,
-                                focusedIndicatorColor = Color.Transparent,
-                                unfocusedIndicatorColor = Color.Transparent
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(start = 12.dp, end = 8.dp),
+                            textStyle = MaterialTheme.typography.bodyMedium.copy(
+                                color = MaterialTheme.colorScheme.onSurface
                             ),
-                            singleLine = true
+                            singleLine = true,
+                            decorationBox = { innerTextField ->
+                                Box(
+                                    contentAlignment = Alignment.CenterStart,
+                                    modifier = Modifier.fillMaxSize()
+                                ) {
+                                    if (taskName.isEmpty()) {
+                                        Text(
+                                            text = "Type your task here ",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                        )
+                                    }
+                                    innerTextField()
+                                }
+                            }
                         )
 
                         // Separate (+) button on the right side
@@ -927,6 +946,10 @@ fun CalenderScreen(
     }
 }
 
+val liAdorNoirritFontFamily = FontFamily(
+    Font(R.font.li_ador_noirrit_regular)
+)
+
 @Composable
 fun PresetEventTile(
     eventName: String,
@@ -958,8 +981,10 @@ fun PresetEventTile(
             Spacer(modifier = Modifier.width(12.dp))
             Text(
                 text = eventName,
+                fontFamily = liAdorNoirritFontFamily,
                 style = MaterialTheme.typography.bodyLarge.copy(
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.Normal,
+                    fontSize = 18.sp,
                     color = eventColor
                 )
             )
@@ -1003,8 +1028,10 @@ fun EventTile(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = eventName,
+                    fontFamily = liAdorNoirritFontFamily,
                     style = MaterialTheme.typography.bodyLarge.copy(
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.Normal,
+                        fontSize = 18.sp,
                         color = eventColor
                     )
                 )

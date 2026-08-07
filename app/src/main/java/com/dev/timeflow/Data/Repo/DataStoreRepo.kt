@@ -78,4 +78,21 @@ class DataStoreRepo @Inject constructor(
             calendarType
         }
     }
+
+    suspend fun saveCheckedPrayers(dateStr: String, checkedSet: Set<String>) {
+        dataStore.edit { prefs ->
+            val key = stringPreferencesKey("prayer_$dateStr")
+            prefs[key] = checkedSet.joinToString(",")
+        }
+    }
+
+    fun getCheckedPrayers(dateStr: String): Flow<Set<String>> {
+        return dataStore.data.catch {
+            if (it is IOException) emit(emptyPreferences()) else throw it
+        }.map { prefs ->
+            val key = stringPreferencesKey("prayer_$dateStr")
+            val valStr = prefs[key] ?: ""
+            if (valStr.isEmpty()) emptySet() else valStr.split(",").toSet()
+        }
+    }
 }

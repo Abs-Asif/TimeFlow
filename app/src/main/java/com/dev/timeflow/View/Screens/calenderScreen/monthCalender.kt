@@ -64,7 +64,8 @@ fun MonthCalender(
             isSelected && dayPosition -> MaterialTheme.colorScheme.onPrimary
             isSelected && !dayPosition -> MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
             isToday -> MaterialTheme.colorScheme.primary
-            isFriday -> Color.Red
+            isFriday && dayPosition -> Color.Red
+            isFriday && !dayPosition -> Color.Red.copy(alpha = 0.2f)
             dayPosition -> MaterialTheme.colorScheme.onSurface
             else -> MaterialTheme.colorScheme.onSurface.copy(
                 alpha = 0.2f
@@ -145,13 +146,15 @@ fun MonthCalender(
                                 bottomEnd = if (hasNext) 0.dp else 1.5.dp
                             )
 
+                            val baseColor = Color(android.graphics.Color.parseColor(event.colorHex))
+                            val finalColor = if (dayPosition) baseColor else baseColor.copy(alpha = 0.2f)
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(start = leftPadding, end = rightPadding)
                                     .height(3.dp)
                                     .background(
-                                        color = Color(android.graphics.Color.parseColor(event.colorHex)),
+                                        color = finalColor,
                                         shape = shape
                                     )
                             )

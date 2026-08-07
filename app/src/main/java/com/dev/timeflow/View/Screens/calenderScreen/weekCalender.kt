@@ -72,7 +72,7 @@ fun WeekCalender(
         val weekdayName = weekDate.date.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault())
         Text(
             text = weekdayName,
-            fontSize = 12.sp,
+            fontSize = 15.sp,
             color = if (isFriday) Color.Red else MaterialTheme.colorScheme.onSurface,
             fontWeight = if (isFriday) FontWeight.Bold else FontWeight.Normal,
             modifier = Modifier.padding(bottom = 2.dp)

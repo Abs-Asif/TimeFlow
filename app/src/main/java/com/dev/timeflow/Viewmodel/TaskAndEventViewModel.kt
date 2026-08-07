@@ -333,32 +333,35 @@ class TaskAndEventViewModel @Inject constructor(
         }
     }
 
-    private val pleasantColors = listOf(
-        "#FF0000", // Red
-        "#0000FF", // Blue
-        "#008000", // Green
-        "#FFFF00", // Yellow
-        "#FF00FF", // Magenta
-        "#00FFFF", // Cyan
-        "#FFA500", // Orange
-        "#800080", // Purple
-        "#A52A2A", // Brown
-        "#FFC0CB", // Pink
-        "#008080", // Teal
-        "#00FF00"  // Lime
-    )
+    private fun hslToHex(h: Float, s: Float, l: Float): String {
+        val c = (1f - Math.abs(2f * l - 1f)) * s
+        val x = c * (1f - Math.abs((h / 60f) % 2f - 1f))
+        val m = l - c / 2f
+        var r = 0f
+        var g = 0f
+        var b = 0f
+
+        when {
+            h < 60 -> { r = c; g = x; b = 0f }
+            h < 120 -> { r = x; g = c; b = 0f }
+            h < 180 -> { r = 0f; g = c; b = x }
+            h < 240 -> { r = 0f; g = x; b = c }
+            h < 300 -> { r = x; g = 0f; b = c }
+            else -> { r = c; g = 0f; b = x }
+        }
+
+        val rInt = Math.round((r + m) * 255f).coerceIn(0, 255)
+        val gInt = Math.round((g + m) * 255f).coerceIn(0, 255)
+        val bInt = Math.round((b + m) * 255f).coerceIn(0, 255)
+
+        return String.format("#%02X%02X%02X", rInt, gInt, bInt)
+    }
 
     fun getUniqueColorForRange(startDate: Long, endDate: Long): String {
-        val overlappingEvents = _allEvents.value.filter {
-            it.startDate <= endDate && it.endDate >= startDate
-        }
-        val usedColors = overlappingEvents.map { it.colorHex.uppercase() }.toSet()
-        for (color in pleasantColors) {
-            if (color.uppercase() !in usedColors) {
-                return color
-            }
-        }
-        return pleasantColors.random()
+        val h = (0..359).random().toFloat()
+        val s = 0.35f + (0..10).random() * 0.01f // Saturation: 0.35 to 0.45
+        val l = 0.75f + (0..10).random() * 0.01f // Lightness: 0.75 to 0.85
+        return hslToHex(h, s, l)
     }
 
     fun scheduleNotification (notificationAlarmManagerModel: NotificationAlarmManagerModel){

@@ -359,8 +359,8 @@ class TaskAndEventViewModel @Inject constructor(
 
     fun getUniqueColorForRange(startDate: Long, endDate: Long): String {
         val h = (0..359).random().toFloat()
-        val s = 0.35f + (0..10).random() * 0.01f // Saturation: 0.35 to 0.45
-        val l = 0.75f + (0..10).random() * 0.01f // Lightness: 0.75 to 0.85
+        val s = 0.80f + (0..20).random() * 0.01f // Saturation: 0.80 to 1.00 (glowing, vivid)
+        val l = 0.55f + (0..15).random() * 0.01f // Lightness: 0.55 to 0.70 (bright enough on pure black)
         return hslToHex(h, s, l)
     }
 

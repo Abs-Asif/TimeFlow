@@ -25,11 +25,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.dev.timeflow.R
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+
+val liAdorNoirritFontFamily = FontFamily(
+    Font(R.font.li_ador_noirrit_regular)
+)
 
 @Composable
 fun TaskTile(
@@ -90,9 +98,11 @@ fun TaskTile(
             Text(
                 modifier = Modifier.weight(1f),
                 text = taskName,
+                fontFamily = liAdorNoirritFontFamily,
                 textDecoration = if (taskIsCompleted) TextDecoration.LineThrough else TextDecoration.None,
                 style = MaterialTheme.typography.bodyLarge.copy(
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.Normal,
+                    fontSize = 18.sp,
                     color = MaterialTheme.colorScheme.onBackground
                 )
             )

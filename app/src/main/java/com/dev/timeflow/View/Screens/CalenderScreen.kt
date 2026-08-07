@@ -11,6 +11,8 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -35,12 +37,15 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
@@ -83,7 +88,6 @@ import com.dev.timeflow.View.utils.componets.SheetToEditTask
 import com.dev.timeflow.View.utils.componets.SheetToAddEvent
 import com.dev.timeflow.View.utils.componets.SheetToEditEvent
 import com.dev.timeflow.View.utils.componets.MonthYearPickerDialog
-import com.dev.timeflow.View.utils.componets.RoundedFabMenu
 import com.dev.timeflow.View.utils.componets.TaskTile
 import com.dev.timeflow.View.utils.endOfDayMillis
 import com.dev.timeflow.View.utils.toDateTimeInMillis
@@ -204,20 +208,43 @@ fun CalenderScreen(
     val eventsForDate by taskViewModel.eventsForDate.collectAsState(emptyList())
     val allEvents by taskViewModel.allEvents.collectAsState(emptyList())
     val currentTask by taskViewModel.currentTask.collectAsState(null)
+
+    val eventLanes = remember(allEvents) {
+        val sorted = allEvents.sortedWith(compareBy({ it.startDate }, { it.id }))
+        val lanes = mutableMapOf<Long, Int>()
+        for (event in sorted) {
+            val occupiedLanes = mutableSetOf<Int>()
+            for (other in sorted) {
+                if (other.id == event.id) continue
+                if (lanes.containsKey(other.id)) {
+                    val overlap = !(event.endDate < other.startDate || event.startDate > other.endDate)
+                    if (overlap) {
+                        occupiedLanes.add(lanes[other.id]!!)
+                    }
+                }
+            }
+            var lane = 0
+            while (lane in occupiedLanes) {
+                lane++
+            }
+            lanes[event.id] = lane
+        }
+        lanes
+    }
     val currentEvent by taskViewModel.currentEvent.collectAsState(null)
 
     val presetEvents = remember(currentSelectedDate) {
         val month = currentSelectedDate.monthValue
         val day = currentSelectedDate.dayOfMonth
-        val list = mutableListOf<String>()
+        val list = mutableListOf<Pair<String, String>>()
         if (month == 5 && day == 29) {
-            list.add("Our Anniversary 🎉")
+            list.add(Pair("Our Anniversary 🎉", "#FF00FF")) // Magenta
         }
         if (month == 2 && day == 18) {
-            list.add("Asif's Birthday 🎉")
+            list.add(Pair("Asif's Birthday 🎉", "#FFA500")) // Orange
         }
         if (month == 7 && day == 5) {
-            list.add("Monalisa's Birthday 🎉")
+            list.add(Pair("Monalisa's Birthday 🎉", "#008080")) // Teal
         }
         list
     }
@@ -430,14 +457,22 @@ fun CalenderScreen(
 
     Scaffold(
         topBar = {
+            val displayTitle = if (visibleYear != currentDate.year) {
+                "$visibleMonth $visibleYear"
+            } else {
+                visibleMonth
+            }
             TopAppBar(
                 title = {
                     AnimatedContent(
-                        targetState = visibleMonth,
+                        targetState = displayTitle,
                         label = "MonthAnimation"
-                    ) { month ->
+                    ) { titleText ->
                         Text(
-                            text = month,
+                            text = titleText,
+                            modifier = Modifier.clickable {
+                                showJumpToDatePicker = true
+                            },
                             style = MaterialTheme.typography.titleLarge.copy(
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
@@ -446,42 +481,21 @@ fun CalenderScreen(
                     }
                 },
                 actions = {
-                    AnimatedContent(
-                        targetState = visibleYear,
-                        label = "YearAnimation",
-                        transitionSpec = {
-                            fadeIn() togetherWith fadeOut()
+                    IconButton(
+                        modifier = Modifier.padding(end = 8.dp),
+                        onClick = {
+                            currentSelectedDate = currentDate
+                            scope.launch {
+                                state.scrollToMonth(YearMonth.from(currentDate))
+                            }
                         }
-                    ) { year ->
-                        Text(
-                            modifier = Modifier.padding(end = 16.dp),
-                            text = year.toString(),
-                            style = MaterialTheme.typography.titleLarge.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
+                    ) {
+                        Icon(
+                            imageVector = Lucide.Calendar,
+                            contentDescription = "Today",
+                            tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
-                }
-            )
-        },
-        floatingActionButton = {
-            RoundedFabMenu(
-                todayDate = currentDate,
-                onBackToToday = {
-                    currentSelectedDate = currentDate
-                    scope.launch {
-                        state.scrollToMonth(YearMonth.from(currentDate))
-                    }
-                },
-                onJumpToDate = {
-                    showJumpToDatePicker = true
-                },
-                onCreateTask = {
-                    showBottomSheet = true
-                },
-                onCreateEvent = {
-                    showEventBottomSheet = true
                 }
             )
         },
@@ -553,19 +567,32 @@ fun CalenderScreen(
 
         // Horizontal swipe gesture below calendar to navigate days forward/backward
         var horizontalDrag by remember { mutableStateOf(0f) }
+        var hasSwipedForCurrentGesture by remember { mutableStateOf(false) }
         val horizontalSwipeModifier = Modifier.pointerInput(Unit) {
             detectHorizontalDragGestures(
-                onDragEnd = { horizontalDrag = 0f },
-                onDragCancel = { horizontalDrag = 0f },
+                onDragStart = {
+                    horizontalDrag = 0f
+                    hasSwipedForCurrentGesture = false
+                },
+                onDragEnd = {
+                    horizontalDrag = 0f
+                    hasSwipedForCurrentGesture = false
+                },
+                onDragCancel = {
+                    horizontalDrag = 0f
+                    hasSwipedForCurrentGesture = false
+                },
                 onHorizontalDrag = { change, dragAmount ->
                     change.consume()
-                    horizontalDrag += dragAmount
-                    if (horizontalDrag > 80f) {
-                        currentSelectedDate = currentSelectedDate.minusDays(1)
-                        horizontalDrag = 0f
-                    } else if (horizontalDrag < -80f) {
-                        currentSelectedDate = currentSelectedDate.plusDays(1)
-                        horizontalDrag = 0f
+                    if (!hasSwipedForCurrentGesture) {
+                        horizontalDrag += dragAmount
+                        if (horizontalDrag > 80f) {
+                            currentSelectedDate = currentSelectedDate.minusDays(1)
+                            hasSwipedForCurrentGesture = true
+                        } else if (horizontalDrag < -80f) {
+                            currentSelectedDate = currentSelectedDate.plusDays(1)
+                            hasSwipedForCurrentGesture = true
+                        }
                     }
                 }
             )
@@ -584,7 +611,16 @@ fun CalenderScreen(
             ) {
                 AnimatedContent(
                     targetState = isWeekMode,
-                    label = "CalendarViewMode"
+                    label = "CalendarViewMode",
+                    transitionSpec = {
+                        if (targetState) { // Transitioning to week mode (collapsing)
+                            (slideInVertically { height -> -height } + fadeIn() togetherWith
+                             slideOutVertically { height -> height } + fadeOut())
+                        } else { // Transitioning to month mode (expanding)
+                            (slideInVertically { height -> height } + fadeIn() togetherWith
+                             slideOutVertically { height -> -height } + fadeOut())
+                        }
+                    }
                 ) { weekMode ->
                     if (weekMode) {
                         val weekState = rememberWeekCalendarState(
@@ -610,7 +646,8 @@ fun CalenderScreen(
                                     selectedDate = currentSelectedDate,
                                     onClick = { currentSelectedDate = it },
                                     weekDate = weekDay,
-                                    activeEvents = cellActiveEvents
+                                    activeEvents = cellActiveEvents,
+                                    eventLanes = eventLanes
                                 )
                             }
                         )
@@ -631,6 +668,7 @@ fun CalenderScreen(
                                     hapticFeedback = haptics,
                                     selectedDate = currentSelectedDate,
                                     activeEvents = cellActiveEvents,
+                                    eventLanes = eventLanes,
                                     onClick = { date ->
                                         currentSelectedDate = date
                                     }
@@ -676,8 +714,8 @@ fun CalenderScreen(
                             LazyColumn(
                                 modifier = modifier.fillMaxSize()
                             ) {
-                                items(presetEvents) { eventName ->
-                                    PresetEventTile(eventName = eventName)
+                                items(presetEvents) { (eventName, colorHex) ->
+                                    PresetEventTile(eventName = eventName, colorHex = colorHex)
                                 }
                                 // Render Events ALWAYS on top of Tasks
                                 items(eventsForDate) { event ->
@@ -734,6 +772,80 @@ fun CalenderScreen(
                     }
                 }
             }
+
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                shape = RoundedCornerShape(28.dp),
+                shadowElevation = 3.dp
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 4.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Separate event adding button on the left side of the Typing bar
+                    IconButton(
+                        onClick = {
+                            showEventBottomSheet = true
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Lucide.Calendar,
+                            contentDescription = "Add Event",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    TextField(
+                        value = taskName,
+                        onValueChange = { taskName = it },
+                        placeholder = { Text("Type your task here ") },
+                        modifier = Modifier.weight(1f),
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent,
+                            disabledContainerColor = Color.Transparent,
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent
+                        ),
+                        singleLine = true
+                    )
+
+                    // Separate (+) button on the right side
+                    IconButton(
+                        onClick = {
+                            if (taskName.isNotEmpty()) {
+                                taskViewModel.insertTask(
+                                    tasks = Tasks(
+                                        id = 0,
+                                        name = taskName,
+                                        description = "",
+                                        notification = true,
+                                        importance = "Low",
+                                        taskTime = currentSelectedDate
+                                            .atStartOfDay(ZoneId.systemDefault())
+                                            .toInstant()
+                                            .toEpochMilli(),
+                                        createdAt = currentSelectedDate.toMillis(localTime = LocalTime.now())
+                                    )
+                                )
+                                taskName = ""
+                            }
+                        },
+                        enabled = taskName.isNotEmpty()
+                    ) {
+                        Icon(
+                            imageVector = Lucide.Plus,
+                            contentDescription = "Add Task",
+                            tint = if (taskName.isNotEmpty()) MaterialTheme.colorScheme.primary else Color.Gray
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -741,8 +853,10 @@ fun CalenderScreen(
 @Composable
 fun PresetEventTile(
     eventName: String,
+    colorHex: String,
     modifier: Modifier = Modifier
 ) {
+    val eventColor = Color(android.graphics.Color.parseColor(colorHex))
     Surface(
         modifier = modifier
             .fillMaxWidth()
@@ -757,7 +871,7 @@ fun PresetEventTile(
             Icon(
                 imageVector = Lucide.Calendar,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                tint = eventColor,
                 modifier = Modifier.size(24.dp)
             )
             Spacer(modifier = Modifier.width(12.dp))
@@ -765,7 +879,7 @@ fun PresetEventTile(
                 text = eventName,
                 style = MaterialTheme.typography.bodyLarge.copy(
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                    color = eventColor
                 )
             )
         }
@@ -781,17 +895,14 @@ fun EventTile(
     colorHex: String,
     onClick: () -> Unit
 ) {
+    val eventColor = Color(android.graphics.Color.parseColor(colorHex))
     Surface(
         modifier = modifier
             .fillMaxWidth()
             .padding(vertical = 6.dp)
             .clickable { onClick() },
-        color = Color(android.graphics.Color.parseColor(colorHex)).copy(alpha = 0.15f),
-        shape = RoundedCornerShape(12.dp),
-        border = androidx.compose.foundation.BorderStroke(
-            1.dp,
-            Color(android.graphics.Color.parseColor(colorHex))
-        )
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        shape = RoundedCornerShape(12.dp)
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
@@ -800,7 +911,7 @@ fun EventTile(
             Icon(
                 imageVector = Lucide.Calendar,
                 contentDescription = null,
-                tint = Color(android.graphics.Color.parseColor(colorHex)),
+                tint = eventColor,
                 modifier = Modifier.size(24.dp)
             )
             Spacer(modifier = Modifier.width(12.dp))
@@ -809,13 +920,13 @@ fun EventTile(
                     text = eventName,
                     style = MaterialTheme.typography.bodyLarge.copy(
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = eventColor
                     )
                 )
                 Text(
                     text = "$startDateStr - $endDateStr",
                     style = MaterialTheme.typography.bodySmall.copy(
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        color = eventColor.copy(alpha = 0.8f)
                     )
                 )
             }

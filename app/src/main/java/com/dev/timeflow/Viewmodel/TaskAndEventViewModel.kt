@@ -99,27 +99,36 @@ class TaskAndEventViewModel @Inject constructor(
     // function to add a task to the database
     fun insertTask(tasks: Tasks){
         viewModelScope.launch(Dispatchers.IO) {
-            taskRepo.insertTask(
+            val generatedId = taskRepo.insertTask(
                 tasks = tasks
             )
-            if (tasks.notification && tasks.taskTime != 0.toLong()){
-                //type 1
+            if (tasks.notification) {
+                val taskDate = tasks.taskTime?.toLocalDate() ?: tasks.createdAt.toLocalDate()
 
-              scheduleNotification(
-                  notificationAlarmManagerModel = NotificationAlarmManagerModel(
-                      id = tasks.id,
-                      type = 1,
-                      hour = tasks.taskTime!!.toHour(),
-                      minute = tasks.taskTime.toMinute(),
-                      title = tasks.name,
-                      localDate = tasks.taskTime.toLocalDate()
-                  )
-              )
-            } else {
-                println("notification has been turned off")
+                // 1. Alarm for 12:00 AM (hour = 0, minute = 0)
+                scheduleNotification(
+                    notificationAlarmManagerModel = NotificationAlarmManagerModel(
+                        id = generatedId,
+                        type = 1,
+                        hour = 0,
+                        minute = 0,
+                        title = tasks.name,
+                        localDate = taskDate
+                    )
+                )
+
+                // 2. Alarm for 7:00 AM (hour = 7, minute = 0)
+                scheduleNotification(
+                    notificationAlarmManagerModel = NotificationAlarmManagerModel(
+                        id = generatedId,
+                        type = 1,
+                        hour = 7,
+                        minute = 0,
+                        title = tasks.name,
+                        localDate = taskDate
+                    )
+                )
             }
-
-            Log.d("TESTING NOTIFICATION","${tasks.taskTime!!.toHour()} ${tasks.taskTime.toMinute()} task date ${tasks.taskTime.toLocalDate()}")
         }
     }
 
@@ -129,6 +138,33 @@ class TaskAndEventViewModel @Inject constructor(
             taskRepo.updateTask(
                 tasks = tasks
             )
+            if (tasks.notification) {
+                val taskDate = tasks.taskTime?.toLocalDate() ?: tasks.createdAt.toLocalDate()
+
+                // 1. Alarm for 12:00 AM (hour = 0, minute = 0)
+                scheduleNotification(
+                    notificationAlarmManagerModel = NotificationAlarmManagerModel(
+                        id = tasks.id,
+                        type = 1,
+                        hour = 0,
+                        minute = 0,
+                        title = tasks.name,
+                        localDate = taskDate
+                    )
+                )
+
+                // 2. Alarm for 7:00 AM (hour = 7, minute = 0)
+                scheduleNotification(
+                    notificationAlarmManagerModel = NotificationAlarmManagerModel(
+                        id = tasks.id,
+                        type = 1,
+                        hour = 7,
+                        minute = 0,
+                        title = tasks.name,
+                        localDate = taskDate
+                    )
+                )
+            }
         }
     }
 

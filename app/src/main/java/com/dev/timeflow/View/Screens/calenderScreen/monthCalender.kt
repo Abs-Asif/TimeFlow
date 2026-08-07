@@ -43,16 +43,16 @@ fun MonthCalender(
     val isSelected = selectedDate == day.date
     val isToday = date == day.date
     val isFriday = day.date.dayOfWeek == java.time.DayOfWeek.FRIDAY
-    val showRedActive = isSelected || isToday
 
     val boxSelectedColor by animateColorAsState(
-        targetValue = if (showRedActive) Color.Red else Color.Transparent,
+        targetValue = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
         label = "BoxSelectedColor"
     )
 
     val boxTextColor by animateColorAsState(
         targetValue = when {
-            showRedActive -> Color.Black
+            isSelected -> MaterialTheme.colorScheme.onPrimary
+            isToday -> MaterialTheme.colorScheme.primary
             isFriday -> Color.Red
             dayPosition -> MaterialTheme.colorScheme.onSurface
             else -> MaterialTheme.colorScheme.onSurface.copy(
@@ -69,8 +69,8 @@ fun MonthCalender(
                 .padding(4.dp)
                 .clip(CircleShape)
                 .border(
-                    width = if (isToday) 2.dp else 0.dp,
-                    color = if (isToday) Color.Red else Color.Transparent,
+                    width = if (isToday) 1.5.dp else 0.dp,
+                    color = if (isToday) MaterialTheme.colorScheme.primary else Color.Transparent,
                     shape = CircleShape
                 )
                 .background(
@@ -96,7 +96,7 @@ fun MonthCalender(
                 Text(
                     modifier = modifier.padding(0.dp),
                     text = day.date.dayOfMonth.toString(),
-                    fontWeight = if (showRedActive) FontWeight.Bold else FontWeight.Normal,
+                    fontWeight = if (isSelected || isToday) FontWeight.Bold else FontWeight.Normal,
                     color = boxTextColor
                 )
             }

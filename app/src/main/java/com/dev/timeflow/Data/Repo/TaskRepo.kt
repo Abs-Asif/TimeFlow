@@ -9,8 +9,8 @@ class TaskRepo @Inject constructor(
     private val taskDao: TaskDao
 ){
     //function to insert or add a task
-   suspend fun insertTask(tasks: Tasks){
-        taskDao.insertTask(
+   suspend fun insertTask(tasks: Tasks): Long {
+        return taskDao.insertTask(
             tasks = tasks
         )
     }

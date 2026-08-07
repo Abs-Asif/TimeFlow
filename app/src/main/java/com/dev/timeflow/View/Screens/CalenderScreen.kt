@@ -14,10 +14,13 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
@@ -57,9 +60,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil3.compose.AsyncImage
+import com.composables.icons.lucide.Calendar
 import com.composables.icons.lucide.ListTodo
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Plus
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.Surface
 import com.dev.timeflow.Data.Model.ImportanceChipModel
 import com.dev.timeflow.Data.Model.SavingModel
 import com.dev.timeflow.Data.Model.Tasks
@@ -79,11 +85,14 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.time.YearMonth
 import java.time.ZoneId
+import android.os.Build
+import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.rememberPermissionState
 import java.time.format.TextStyle
 import java.util.Calendar
 import java.util.Locale
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
 @Composable
 fun CalenderScreen(
     modifier: Modifier = Modifier
@@ -91,6 +100,21 @@ fun CalenderScreen(
     val haptics = LocalHapticFeedback.current
     val localContext = LocalContext.current
     val taskViewModel: TaskAndEventViewModel = hiltViewModel()
+
+    val permission = rememberPermissionState(
+        permission = android.Manifest.permission.POST_NOTIFICATIONS
+    )
+
+    val isOnboardingCompleted by taskViewModel.readOnBoardingState().collectAsState(initial = true)
+
+    LaunchedEffect(isOnboardingCompleted) {
+        if (!isOnboardingCompleted) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                permission.launchPermissionRequest()
+            }
+            taskViewModel.saveOnBoarding()
+        }
+    }
     val currentMonth = remember { YearMonth.now() }
     val startMonth = remember { currentMonth.minusMonths(100) }
     val endMonth = remember { currentMonth.plusMonths(100) }
@@ -151,6 +175,22 @@ fun CalenderScreen(
 
     val tasksForDate by taskViewModel.taskForDate.collectAsState(emptyList())
     val currentTask by taskViewModel.currentTask.collectAsState(null)
+
+    val presetEvents = remember(currentSelectedDate) {
+        val month = currentSelectedDate.monthValue
+        val day = currentSelectedDate.dayOfMonth
+        val list = mutableListOf<String>()
+        if (month == 5 && day == 29) {
+            list.add("Our Anniversary 🎉")
+        }
+        if (month == 2 && day == 18) {
+            list.add("Asif's Birthday 🎉")
+        }
+        if (month == 7 && day == 5) {
+            list.add("Monalisa's Birthday 🎉")
+        }
+        list
+    }
 
     val importanceChip = listOf<ImportanceChipModel>(
         ImportanceChipModel(
@@ -238,16 +278,8 @@ fun CalenderScreen(
             onDismiss = {
                 showBottomSheet = false
                 taskName = ""
-                taskDescription = ""
-                switchState = false
-                timePickerState.hour = localTime.hour
-                timePickerState.minute = localTime.minute
             },
             modifier = modifier,
-            onSwitchState = {
-                switchState = it
-            },
-            selectedSavingType = 0,
             isButtonEnabled = taskName.isNotEmpty(),
             onTaskSave = {
                 taskViewModel.insertTask(
@@ -255,64 +287,25 @@ fun CalenderScreen(
                         id = 0,
                         name = taskName,
                         description = "",
-                        notification = switchState,
+                        notification = true,
                         importance = "Low",
-                        taskTime = if (switchState) Calendar.getInstance().toDateTimeInMillis(
-                            hour = timePickerState.hour,
-                            minute = timePickerState.minute,
-                            date = currentSelectedDate
-                        ) else {
-                            0
-                        },
+                        taskTime = currentSelectedDate
+                            .atStartOfDay(ZoneId.systemDefault())
+                            .toInstant()
+                            .toEpochMilli(),
                         createdAt = currentSelectedDate.toMillis(localTime = localTime)
                     )
                 )
-                switchState = false
-                timePickerState.hour = localTime.hour
-                timePickerState.minute = localTime.minute
-            },
-            onEventSave = {},
-            onSelectedImportantChipChange = {
-                selectedChip = it
             },
             onTaskNameChange = {
                 taskName = it
             },
-            onTaskDescriptionChange = {
-                taskDescription = it
-            },
-            changeSavingType = {},
-            savingChipList = dummySavingChipList,
-            importanceChip = importanceChip,
-            hapticFeedback = haptics,
-            switchState = switchState,
-            taskName = taskName,
-            taskDescription = taskDescription,
-            selectedImportantChip = selectedChip,
-            showTimeState = showTime,
-            onTimeState = {
-                showTime = it
-            },
-            timerState = timePickerState,
-            onPermissionState = {
-                showPermissionDialog = it
-            },
-            onFromTileClick = {},
-            onToTileClick = {},
-            fromTimePickerState = fromTimePickerState,
-            toTimePickerState = toTimePickerState,
-            fromDatePickerState = fromDatePickerState,
-            toDatePickerState = toDatePickerState,
-            onFromTimePicker = {},
-            onToTimePicker = {}
+            taskName = taskName
         )
     }
 
     if (showTaskDetails && currentTask != null) {
         val latestTask = tasksForDate.find { it.id == currentTask!!.id } ?: currentTask!!
-
-        var editedDescription by remember(latestTask.id) { mutableStateOf(latestTask.description ?: "") }
-        var editedName by remember(latestTask.id) { mutableStateOf(latestTask.name) }
 
         SheetToEditTask(
             tasks = latestTask,
@@ -320,22 +313,12 @@ fun CalenderScreen(
                 showTaskDetails = false
                 taskViewModel.clearTask()
             },
-            onCheckBoxValueChange = {
-                taskViewModel.updateTask(
-                    latestTask.copy(
-                        isCompleted = it
-                    )
-                )
-            },
-            onValueChange = {
-                editedDescription = it
-            },
-            onNameValueChange = {
-                editedName = it
-            },
             onDeleteTask = {
-                taskViewModel.deleteTask(
-                    latestTask
+                taskViewModel.deleteTask(latestTask)
+            },
+            onSaveTask = { newName ->
+                taskViewModel.updateTask(
+                    latestTask.copy(name = newName)
                 )
             }
         )
@@ -479,9 +462,9 @@ fun CalenderScreen(
                 AnimatedContent(
                     modifier = modifier
                         .align(Alignment.CenterHorizontally),
-                    targetState = tasksForDate.isNotEmpty()
-                ) { hasTasks ->
-                    if (hasTasks) {
+                    targetState = tasksForDate.isNotEmpty() || presetEvents.isNotEmpty()
+                ) { hasContent ->
+                    if (hasContent) {
                         Column(
                             modifier = modifier
                                 .fillMaxSize()
@@ -490,6 +473,9 @@ fun CalenderScreen(
                             LazyColumn(
                                 modifier = modifier.fillMaxSize()
                             ) {
+                                items(presetEvents) { eventName ->
+                                    PresetEventTile(eventName = eventName)
+                                }
                                 items(tasksForDate){ task ->
                                     TaskTile(
                                         onUpdateTask = { value ->
@@ -532,6 +518,40 @@ fun CalenderScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun PresetEventTile(
+    eventName: String,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp),
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Lucide.Calendar,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                modifier = Modifier.size(24.dp)
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = eventName,
+                style = MaterialTheme.typography.bodyLarge.copy(
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+            )
         }
     }
 }

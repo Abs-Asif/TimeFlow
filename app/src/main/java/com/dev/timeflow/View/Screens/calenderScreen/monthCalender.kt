@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.sp
 import com.kizitonwose.calendar.core.CalendarDay
 import com.kizitonwose.calendar.core.DayPosition
 import com.dev.timeflow.Data.Model.Events
+import com.dev.timeflow.View.utils.toLocalDate
 import java.time.LocalDate
 
 @Composable
@@ -40,6 +41,7 @@ fun MonthCalender(
     hapticFeedback: HapticFeedback,
     selectedDate : LocalDate,
     activeEvents : List<Events> = emptyList(),
+    eventLanes : Map<Long, Int> = emptyMap(),
     onClick : (LocalDate) -> Unit
 ) {
     val date = LocalDate.now()
@@ -76,7 +78,7 @@ fun MonthCalender(
         Box(
             modifier = Modifier
                 .aspectRatio(1f)
-                .padding(4.dp)
+                .padding(start = 4.dp, top = 4.dp, end = 4.dp, bottom = 1.dp)
                 .clip(dayCellShape)
                 .border(
                     width = if (isToday) 1.5.dp else 0.dp,
@@ -113,24 +115,45 @@ fun MonthCalender(
         }
 
         if (activeEvents.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(2.dp))
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 6.dp),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                activeEvents.forEach { event ->
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(3.dp)
-                            .background(
-                                color = Color(android.graphics.Color.parseColor(event.colorHex)),
-                                shape = RoundedCornerShape(1.5.dp)
+            val maxLane = activeEvents.mapNotNull { eventLanes[it.id] }.maxOrNull() ?: -1
+            if (maxLane >= 0) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 0.dp),
+                    verticalArrangement = Arrangement.spacedBy(1.5.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    for (lane in 0..maxLane) {
+                        val event = activeEvents.find { eventLanes[it.id] == lane }
+                        if (event != null) {
+                            val hasPrev = day.date.isAfter(event.startDate.toLocalDate())
+                            val hasNext = day.date.isBefore(event.endDate.toLocalDate())
+
+                            val leftPadding = if (hasPrev) 0.dp else 6.dp
+                            val rightPadding = if (hasNext) 0.dp else 6.dp
+
+                            val shape = RoundedCornerShape(
+                                topStart = if (hasPrev) 0.dp else 1.5.dp,
+                                bottomStart = if (hasPrev) 0.dp else 1.5.dp,
+                                topEnd = if (hasNext) 0.dp else 1.5.dp,
+                                bottomEnd = if (hasNext) 0.dp else 1.5.dp
                             )
-                    )
+
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(start = leftPadding, end = rightPadding)
+                                    .height(3.dp)
+                                    .background(
+                                        color = Color(android.graphics.Color.parseColor(event.colorHex)),
+                                        shape = shape
+                                    )
+                            )
+                        } else {
+                            Spacer(modifier = Modifier.height(3.dp))
+                        }
+                    }
                 }
             }
         }

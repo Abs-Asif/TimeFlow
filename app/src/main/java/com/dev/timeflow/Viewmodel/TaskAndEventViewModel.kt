@@ -334,9 +334,18 @@ class TaskAndEventViewModel @Inject constructor(
     }
 
     private val pleasantColors = listOf(
-        "#E57373", "#F06292", "#BA68C8", "#9575CD", "#7986CB",
-        "#64B5F6", "#4FC3F7", "#4DD0E1", "#4DB6AC", "#81C784",
-        "#AED581", "#D4E157", "#FFD54F", "#FFB74D", "#FF8A65"
+        "#FF0000", // Red
+        "#0000FF", // Blue
+        "#008000", // Green
+        "#FFFF00", // Yellow
+        "#FF00FF", // Magenta
+        "#00FFFF", // Cyan
+        "#FFA500", // Orange
+        "#800080", // Purple
+        "#A52A2A", // Brown
+        "#FFC0CB", // Pink
+        "#008080", // Teal
+        "#00FF00"  // Lime
     )
 
     fun getUniqueColorForRange(startDate: Long, endDate: Long): String {

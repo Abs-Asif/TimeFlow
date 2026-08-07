@@ -18,11 +18,13 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -70,6 +72,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil3.compose.AsyncImage
 import com.composables.icons.lucide.Calendar
+import com.composables.icons.lucide.CalendarDays
 import com.composables.icons.lucide.ListTodo
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Plus
@@ -150,6 +153,14 @@ fun CalenderScreen(
     // Variable to hold state of the currently selected date
     var currentSelectedDate by rememberSaveable { mutableStateOf(LocalDate.now()) }
 
+    // Lifted weekState to coordinate synchronization and jumps
+    val weekState = rememberWeekCalendarState(
+        startDate = startMonth.atDay(1),
+        endDate = endMonth.atEndOfMonth(),
+        firstVisibleWeekDate = currentSelectedDate,
+        firstDayOfWeek = firstDayOfWeek
+    )
+
     // Var to hold the switch state of the bottom sheet
     var switchState by rememberSaveable { mutableStateOf(false) }
 
@@ -202,6 +213,9 @@ fun CalenderScreen(
                 .toEpochMilli(),
             end = currentSelectedDate.endOfDayMillis()
         )
+        // Auto scroll to make sure month and week views are in sync with selected date
+        state.scrollToMonth(YearMonth.from(currentSelectedDate))
+        weekState.scrollToWeek(currentSelectedDate)
     }
 
     val tasksForDate by taskViewModel.taskForDate.collectAsState(emptyList())
@@ -209,8 +223,62 @@ fun CalenderScreen(
     val allEvents by taskViewModel.allEvents.collectAsState(emptyList())
     val currentTask by taskViewModel.currentTask.collectAsState(null)
 
-    val eventLanes = remember(allEvents) {
-        val sorted = allEvents.sortedWith(compareBy({ it.startDate }, { it.id }))
+    // Generates virtual Events representing preset unchangeable events for calendar lines
+    val virtualPresetEvents = remember {
+        val list = mutableListOf<Events>()
+        for (year in 2000..2100) {
+            // May 29: Anniversary
+            val annivDate = LocalDate.of(year, 5, 29)
+            val annivStart = annivDate.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+            list.add(
+                Events(
+                    id = -(year * 100 + 1).toLong(),
+                    name = "Our Anniversary 🎉",
+                    startDate = annivStart,
+                    endDate = annivDate.atStartOfDay(ZoneId.systemDefault()).plusDays(1).toInstant().toEpochMilli() - 1,
+                    colorHex = "#FF00FF", // Magenta
+                    createdAt = annivStart
+                )
+            )
+
+            // Feb 18: Asif's Birthday
+            val asifDate = LocalDate.of(year, 2, 18)
+            val asifStart = asifDate.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+            list.add(
+                Events(
+                    id = -(year * 100 + 2).toLong(),
+                    name = "Asif's Birthday 🎉",
+                    startDate = asifStart,
+                    endDate = asifDate.atStartOfDay(ZoneId.systemDefault()).plusDays(1).toInstant().toEpochMilli() - 1,
+                    colorHex = "#FFA500", // Orange
+                    createdAt = asifStart
+                )
+            )
+
+            // July 5: Monalisa's Birthday
+            val monaDate = LocalDate.of(year, 7, 5)
+            val monaStart = monaDate.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+            list.add(
+                Events(
+                    id = -(year * 100 + 3).toLong(),
+                    name = "Monalisa's Birthday 🎉",
+                    startDate = monaStart,
+                    endDate = monaDate.atStartOfDay(ZoneId.systemDefault()).plusDays(1).toInstant().toEpochMilli() - 1,
+                    colorHex = "#008080", // Teal
+                    createdAt = monaStart
+                )
+            )
+        }
+        list
+    }
+
+    // Combine database events and virtual preset events for calendar lines
+    val combinedEvents = remember(allEvents, virtualPresetEvents) {
+        allEvents + virtualPresetEvents
+    }
+
+    val eventLanes = remember(combinedEvents) {
+        val sorted = combinedEvents.sortedWith(compareBy({ it.startDate }, { it.id }))
         val lanes = mutableMapOf<Long, Int>()
         for (event in sorted) {
             val occupiedLanes = mutableSetOf<Int>()
@@ -276,8 +344,16 @@ fun CalenderScreen(
     val dummySavingChipList = listOf(SavingModel("Task", Lucide.ListTodo))
 
     // Determine the visible month and year for the TopAppBar
-    val visibleMonth = state.firstVisibleMonth.yearMonth.month.getDisplayName(TextStyle.FULL, Locale.getDefault())
-    val visibleYear = state.firstVisibleMonth.yearMonth.year
+    val visibleMonth = if (isWeekMode) {
+        currentSelectedDate.month.getDisplayName(TextStyle.FULL, Locale.getDefault())
+    } else {
+        state.firstVisibleMonth.yearMonth.month.getDisplayName(TextStyle.FULL, Locale.getDefault())
+    }
+    val visibleYear = if (isWeekMode) {
+        currentSelectedDate.year
+    } else {
+        state.firstVisibleMonth.yearMonth.year
+    }
 
     if (showPermissionDialog){
         AlertDialog(
@@ -447,9 +523,6 @@ fun CalenderScreen(
                 val length = java.time.YearMonth.of(year, month).lengthOfMonth()
                 val targetDay = currentSelectedDate.dayOfMonth.coerceIn(1, length)
                 currentSelectedDate = LocalDate.of(year, month, targetDay)
-                scope.launch {
-                    state.scrollToMonth(YearMonth.of(year, month))
-                }
                 showJumpToDatePicker = false
             }
         )
@@ -485,9 +558,6 @@ fun CalenderScreen(
                         modifier = Modifier.padding(end = 8.dp),
                         onClick = {
                             currentSelectedDate = currentDate
-                            scope.launch {
-                                state.scrollToMonth(YearMonth.from(currentDate))
-                            }
                         }
                     ) {
                         Icon(
@@ -607,37 +677,24 @@ fun CalenderScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .animateContentSize(animationSpec = spring(stiffness = Spring.StiffnessMedium))
                     .then(verticalSwipeModifier)
             ) {
                 AnimatedContent(
                     targetState = isWeekMode,
                     label = "CalendarViewMode",
                     transitionSpec = {
-                        if (targetState) { // Transitioning to week mode (collapsing)
-                            (slideInVertically { height -> -height } + fadeIn() togetherWith
-                             slideOutVertically { height -> height } + fadeOut())
-                        } else { // Transitioning to month mode (expanding)
-                            (slideInVertically { height -> height } + fadeIn() togetherWith
-                             slideOutVertically { height -> -height } + fadeOut())
-                        }
+                        (fadeIn(animationSpec = spring(stiffness = Spring.StiffnessMedium)) togetherWith
+                         fadeOut(animationSpec = spring(stiffness = Spring.StiffnessMedium)))
                     }
                 ) { weekMode ->
                     if (weekMode) {
-                        val weekState = rememberWeekCalendarState(
-                            startDate = startMonth.atDay(1),
-                            endDate = endMonth.atEndOfMonth(),
-                            firstVisibleWeekDate = currentSelectedDate,
-                            firstDayOfWeek = firstDayOfWeek
-                        )
-                        LaunchedEffect(currentSelectedDate) {
-                            weekState.scrollToWeek(currentSelectedDate)
-                        }
                         WeekCalendar(
                             modifier = modifier.padding(horizontal = 8.dp),
                             state = weekState,
                             dayContent = { weekDay ->
                                 val cellDate = weekDay.date
-                                val cellActiveEvents = allEvents.filter { event ->
+                                val cellActiveEvents = combinedEvents.filter { event ->
                                     val dateStart = event.startDate.toLocalDate()
                                     val dateEnd = event.endDate.toLocalDate()
                                     !cellDate.isBefore(dateStart) && !cellDate.isAfter(dateEnd)
@@ -658,7 +715,7 @@ fun CalenderScreen(
                             reverseLayout = false,
                             dayContent = { day ->
                                 val cellDate = day.date
-                                val cellActiveEvents = allEvents.filter { event ->
+                                val cellActiveEvents = combinedEvents.filter { event ->
                                     val dateStart = event.startDate.toLocalDate()
                                     val dateEnd = event.endDate.toLocalDate()
                                     !cellDate.isBefore(dateStart) && !cellDate.isAfter(dateEnd)
@@ -773,76 +830,96 @@ fun CalenderScreen(
                 }
             }
 
-            Surface(
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                shape = RoundedCornerShape(28.dp),
-                shadowElevation = 3.dp
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 4.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                // Separate event adding button on the left (outside the task adder text box)
+                Surface(
+                    onClick = { showEventBottomSheet = true },
+                    modifier = Modifier.size(44.dp),
+                    shape = androidx.compose.foundation.shape.CircleShape,
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    shadowElevation = 3.dp
                 ) {
-                    // Separate event adding button on the left side of the Typing bar
-                    IconButton(
-                        onClick = {
-                            showEventBottomSheet = true
-                        }
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.fillMaxSize()
                     ) {
                         Icon(
-                            imageVector = Lucide.Calendar,
+                            imageVector = Lucide.CalendarDays,
                             contentDescription = "Add Event",
-                            tint = MaterialTheme.colorScheme.primary
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.size(20.dp)
                         )
                     }
+                }
 
-                    TextField(
-                        value = taskName,
-                        onValueChange = { taskName = it },
-                        placeholder = { Text("Type your task here ") },
-                        modifier = Modifier.weight(1f),
-                        colors = TextFieldDefaults.colors(
-                            focusedContainerColor = Color.Transparent,
-                            unfocusedContainerColor = Color.Transparent,
-                            disabledContainerColor = Color.Transparent,
-                            focusedIndicatorColor = Color.Transparent,
-                            unfocusedIndicatorColor = Color.Transparent
-                        ),
-                        singleLine = true
-                    )
-
-                    // Separate (+) button on the right side
-                    IconButton(
-                        onClick = {
-                            if (taskName.isNotEmpty()) {
-                                taskViewModel.insertTask(
-                                    tasks = Tasks(
-                                        id = 0,
-                                        name = taskName,
-                                        description = "",
-                                        notification = true,
-                                        importance = "Low",
-                                        taskTime = currentSelectedDate
-                                            .atStartOfDay(ZoneId.systemDefault())
-                                            .toInstant()
-                                            .toEpochMilli(),
-                                        createdAt = currentSelectedDate.toMillis(localTime = LocalTime.now())
-                                    )
-                                )
-                                taskName = ""
-                            }
-                        },
-                        enabled = taskName.isNotEmpty()
+                // Compact task adder typing area
+                Surface(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(44.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    shape = RoundedCornerShape(22.dp),
+                    shadowElevation = 3.dp
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            imageVector = Lucide.Plus,
-                            contentDescription = "Add Task",
-                            tint = if (taskName.isNotEmpty()) MaterialTheme.colorScheme.primary else Color.Gray
+                        TextField(
+                            value = taskName,
+                            onValueChange = { taskName = it },
+                            placeholder = { Text("Type your task here ", style = MaterialTheme.typography.bodyMedium) },
+                            modifier = Modifier.weight(1f),
+                            textStyle = MaterialTheme.typography.bodyMedium,
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
+                                disabledContainerColor = Color.Transparent,
+                                focusedIndicatorColor = Color.Transparent,
+                                unfocusedIndicatorColor = Color.Transparent
+                            ),
+                            singleLine = true
                         )
+
+                        // Separate (+) button on the right side
+                        IconButton(
+                            modifier = Modifier.size(36.dp),
+                            onClick = {
+                                if (taskName.isNotEmpty()) {
+                                    taskViewModel.insertTask(
+                                        tasks = Tasks(
+                                            id = 0,
+                                            name = taskName,
+                                            description = "",
+                                            notification = true,
+                                            importance = "Low",
+                                            taskTime = currentSelectedDate
+                                                .atStartOfDay(ZoneId.systemDefault())
+                                                .toInstant()
+                                                .toEpochMilli(),
+                                            createdAt = currentSelectedDate.toMillis(localTime = LocalTime.now())
+                                        )
+                                    )
+                                    taskName = ""
+                                }
+                            },
+                            enabled = taskName.isNotEmpty()
+                        ) {
+                            Icon(
+                                imageVector = Lucide.Plus,
+                                contentDescription = "Add Task",
+                                tint = if (taskName.isNotEmpty()) MaterialTheme.colorScheme.primary else Color.Gray,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -860,20 +937,24 @@ fun PresetEventTile(
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .padding(vertical = 6.dp),
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        shape = RoundedCornerShape(12.dp)
+            .padding(vertical = 4.dp),
+        color = Color.Transparent
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = Lucide.Calendar,
-                contentDescription = null,
-                tint = eventColor,
-                modifier = Modifier.size(24.dp)
-            )
+            Box(
+                modifier = Modifier.size(40.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Lucide.Calendar,
+                    contentDescription = null,
+                    tint = eventColor,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
             Spacer(modifier = Modifier.width(12.dp))
             Text(
                 text = eventName,
@@ -899,21 +980,25 @@ fun EventTile(
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .padding(vertical = 6.dp)
-            .clickable { onClick() },
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        shape = RoundedCornerShape(12.dp)
+            .padding(vertical = 4.dp),
+        color = Color.Transparent,
+        onClick = onClick
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = Lucide.Calendar,
-                contentDescription = null,
-                tint = eventColor,
-                modifier = Modifier.size(24.dp)
-            )
+            Box(
+                modifier = Modifier.size(40.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Lucide.Calendar,
+                    contentDescription = null,
+                    tint = eventColor,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(

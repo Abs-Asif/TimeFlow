@@ -10,12 +10,12 @@
 
     <!-- Red Header Fill -->
     <path
-        android:fillColor="#F44336"
+        android:fillColor="#E91E63"
         android:pathData="M 3 6 A 2 2 0 0 1 5 4 L 19 4 A 2 2 0 0 1 21 6 L 21 10 L 3 10 Z" />
 
     <!-- Outer box outline -->
     <path
-        android:strokeColor="#F44336"
+        android:strokeColor="#E91E63"
         android:strokeWidth="1.5"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
@@ -23,7 +23,7 @@
 
     <!-- Top line under header -->
     <path
-        android:strokeColor="#F44336"
+        android:strokeColor="#E91E63"
         android:strokeWidth="1.5"
         android:strokeLineCap="round"
         android:pathData="M 3 10 L 21 10" />

@@ -4,15 +4,18 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -57,24 +60,29 @@ fun TaskTile(
                 scaleX = scale
                 scaleY = scale
             }
-            .padding(vertical = 6.dp)
-            .clickable { onClick() },
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        shape = RoundedCornerShape(12.dp)
+            .padding(vertical = 4.dp),
+        color = Color.Transparent,
+        onClick = onClick
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            NewCheckBox(
-                isSelected = taskIsCompleted
+            Box(
+                modifier = Modifier.size(40.dp),
+                contentAlignment = Alignment.Center
             ) {
-                scope.launch {
-                    animate = true
-                    delay(200)
-                    animate = false
+                NewCheckBox(
+                    modifier = Modifier,
+                    isSelected = taskIsCompleted
+                ) {
+                    scope.launch {
+                        animate = true
+                        delay(200)
+                        animate = false
+                    }
+                    onUpdateTask.invoke(it)
                 }
-                onUpdateTask.invoke(it)
             }
 
             Spacer(modifier = Modifier.width(12.dp))
@@ -83,8 +91,10 @@ fun TaskTile(
                 modifier = Modifier.weight(1f),
                 text = taskName,
                 textDecoration = if (taskIsCompleted) TextDecoration.LineThrough else TextDecoration.None,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSecondaryContainer
+                style = MaterialTheme.typography.bodyLarge.copy(
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
             )
         }
     }

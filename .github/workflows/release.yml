@@ -46,7 +46,7 @@ jobs:
 
       - name: Rename APK
         run: |
-          mv app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/release/TimeFlow-${{ env.VERSION_NAME }}.apk
+          mv app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/release/Calculator-${{ env.VERSION_NAME }}.apk
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
@@ -57,7 +57,7 @@ jobs:
             Automatic release for merge to master.
             Version: ${{ env.VERSION_NAME }}
           files: |
-            app/build/outputs/apk/release/TimeFlow-${{ env.VERSION_NAME }}.apk
+            app/build/outputs/apk/release/Calculator-${{ env.VERSION_NAME }}.apk
           draft: false
           prerelease: false
         env:

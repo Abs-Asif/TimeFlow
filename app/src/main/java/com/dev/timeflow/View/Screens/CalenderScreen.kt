@@ -101,6 +101,7 @@ import com.composables.icons.lucide.Search
 import com.composables.icons.lucide.Check
 import com.composables.icons.lucide.X
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.Surface
 import com.dev.timeflow.Data.Model.ImportanceChipModel
 import com.dev.timeflow.Data.Model.SavingModel
@@ -1568,6 +1569,8 @@ fun SearchOverlay(
         modifier = Modifier
             .fillMaxSize()
             .graphicsLayer { translationY = searchOffsetY }
+            .statusBarsPadding()
+            .padding(top = 64.dp)
             .background(Color.Black) // AMOLED black background
     ) {
         Column(

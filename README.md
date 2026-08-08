@@ -1,6 +1,6 @@
-# ⏳ Calculator
+# ⏳ Calender
 
-**Calculator** is a modern **Material 3** based Android application designed as an intuitive task management calendar that helps you organize your timeline and meet your goals.
+**Calendar** is a modern **Material 3** based Android application designed as an intuitive task management calendar that helps you organize your timeline and meet your goals.
 
 ## 📅 Features
 

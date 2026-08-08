@@ -634,7 +634,7 @@ fun CalenderScreen(
                     ) { titleText ->
                         Text(
                             text = titleText,
-                            modifier = Modifier.clickable {
+                            modifier = Modifier.clickable(enabled = !showSearchMenu) {
                                 showJumpToDatePicker = true
                             },
                             style = MaterialTheme.typography.titleLarge.copy(
@@ -647,7 +647,9 @@ fun CalenderScreen(
                 actions = {
                     IconButton(
                         onClick = {
-                            showSearchMenu = true
+                            if (!showSearchMenu) {
+                                showSearchMenu = true
+                            }
                         }
                     ) {
                         Icon(
@@ -659,10 +661,12 @@ fun CalenderScreen(
                     IconButton(
                         modifier = Modifier.padding(end = 8.dp),
                         onClick = {
-                            currentSelectedDate = currentDate
-                            scope.launch {
-                                state.scrollToMonth(YearMonth.from(currentDate))
-                                weekState.scrollToWeek(currentDate)
+                            if (!showSearchMenu) {
+                                currentSelectedDate = currentDate
+                                scope.launch {
+                                    state.scrollToMonth(YearMonth.from(currentDate))
+                                    weekState.scrollToWeek(currentDate)
+                                }
                             }
                         }
                     ) {
@@ -723,7 +727,7 @@ fun CalenderScreen(
 
         // Vertical swipe gesture to shrink calendar to week view or expand to month view
         var verticalDrag by remember { mutableStateOf(0f) }
-        val verticalSwipeModifier = Modifier.pointerInput(Unit) {
+        val verticalSwipeModifier = if (showSearchMenu) Modifier else Modifier.pointerInput(Unit) {
             detectVerticalDragGestures(
                 onDragEnd = { verticalDrag = 0f },
                 onDragCancel = { verticalDrag = 0f },
@@ -744,7 +748,7 @@ fun CalenderScreen(
         // Horizontal swipe gesture below calendar to navigate days forward/backward
         var horizontalDrag by remember { mutableStateOf(0f) }
         var hasSwipedForCurrentGesture by remember { mutableStateOf(false) }
-        val horizontalSwipeModifier = Modifier.pointerInput(Unit) {
+        val horizontalSwipeModifier = if (showSearchMenu) Modifier else Modifier.pointerInput(Unit) {
             detectHorizontalDragGestures(
                 onDragStart = {
                     horizontalDrag = 0f
@@ -818,7 +822,7 @@ fun CalenderScreen(
                                             }
                                             WeekCalender(
                                                 selectedDate = currentSelectedDate,
-                                                onClick = { currentSelectedDate = it },
+                                                onClick = { if (!showSearchMenu) currentSelectedDate = it },
                                                 weekDate = weekDay,
                                                 activeEvents = cellActiveEvents,
                                                 eventLanes = eventLanes
@@ -844,7 +848,9 @@ fun CalenderScreen(
                                                 activeEvents = cellActiveEvents,
                                                 eventLanes = eventLanes,
                                                 onClick = { date ->
-                                                    currentSelectedDate = date
+                                                    if (!showSearchMenu) {
+                                                        currentSelectedDate = date
+                                                    }
                                                 }
                                             )
                                         },
@@ -861,27 +867,6 @@ fun CalenderScreen(
                         }
                     }
 
-                    // Local Search Swipe-up Overlay
-                    androidx.compose.animation.AnimatedVisibility(
-                        visible = showSearchMenu,
-                        enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-                        exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        SearchOverlay(
-                            searchQuery = searchQuery,
-                            onSearchQueryChange = { searchQuery = it },
-                            searchResults = searchResults,
-                            onClose = { showSearchMenu = false },
-                            onResultClick = { date ->
-                                currentSelectedDate = date
-                                showSearchMenu = false
-                                searchQuery = ""
-                            },
-                            searchOffsetY = searchOffsetY.value,
-                            searchDragModifier = searchDragModifier
-                        )
-                    }
                 }
 
                 VerticalDivider(
@@ -1042,7 +1027,7 @@ fun CalenderScreen(
                             modifier = Modifier.size(44.dp),
                             shape = androidx.compose.foundation.shape.CircleShape,
                             color = MaterialTheme.colorScheme.primaryContainer,
-                            shadowElevation = 3.dp
+                            shadowElevation = 0.dp
                         ) {
                             Box(
                                 contentAlignment = Alignment.Center,
@@ -1063,7 +1048,7 @@ fun CalenderScreen(
                                 .height(44.dp),
                             color = MaterialTheme.colorScheme.surfaceVariant,
                             shape = RoundedCornerShape(22.dp),
-                            shadowElevation = 3.dp
+                            shadowElevation = 0.dp
                         ) {
                             Row(
                                 modifier = Modifier
@@ -1191,7 +1176,7 @@ fun CalenderScreen(
                                     }
                                     WeekCalender(
                                         selectedDate = currentSelectedDate,
-                                        onClick = { currentSelectedDate = it },
+                                        onClick = { if (!showSearchMenu) currentSelectedDate = it },
                                         weekDate = weekDay,
                                         activeEvents = cellActiveEvents,
                                         eventLanes = eventLanes
@@ -1217,7 +1202,9 @@ fun CalenderScreen(
                                         activeEvents = cellActiveEvents,
                                         eventLanes = eventLanes,
                                         onClick = { date ->
-                                            currentSelectedDate = date
+                                            if (!showSearchMenu) {
+                                                currentSelectedDate = date
+                                            }
                                         }
                                     )
                                 },
@@ -1388,7 +1375,7 @@ fun CalenderScreen(
                         modifier = Modifier.size(44.dp),
                         shape = androidx.compose.foundation.shape.CircleShape,
                         color = MaterialTheme.colorScheme.primaryContainer,
-                        shadowElevation = 3.dp
+                        shadowElevation = 0.dp
                     ) {
                         Box(
                             contentAlignment = Alignment.Center,
@@ -1410,7 +1397,7 @@ fun CalenderScreen(
                             .height(44.dp),
                         color = MaterialTheme.colorScheme.surfaceVariant,
                         shape = RoundedCornerShape(22.dp),
-                        shadowElevation = 3.dp
+                        shadowElevation = 0.dp
                     ) {
                         Row(
                             modifier = Modifier
@@ -1506,25 +1493,62 @@ fun CalenderScreen(
             }
         }
 
-        // Search Slide-up Overlay
+        // Search Slide-up Overlay (always on top of everything, covering the full screen or left side in landscape)
         AnimatedVisibility(
-            visible = showSearchMenu && !isLandscape,
+            visible = showSearchMenu,
             enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
+            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
+            modifier = Modifier.fillMaxSize()
         ) {
-            SearchOverlay(
-                searchQuery = searchQuery,
-                onSearchQueryChange = { searchQuery = it },
-                searchResults = searchResults,
-                onClose = { showSearchMenu = false },
-                onResultClick = { date ->
-                    currentSelectedDate = date
-                    showSearchMenu = false
-                    searchQuery = ""
-                },
-                searchOffsetY = searchOffsetY.value,
-                searchDragModifier = searchDragModifier
-            )
+            if (isLandscape) {
+                Row(modifier = Modifier.fillMaxSize()) {
+                    // Left side: Search Overlay covering left half (weight 1.1)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .weight(1.1f)
+                    ) {
+                        SearchOverlay(
+                            searchQuery = searchQuery,
+                            onSearchQueryChange = { searchQuery = it },
+                            searchResults = searchResults,
+                            onClose = { showSearchMenu = false },
+                            onResultClick = { date ->
+                                currentSelectedDate = date
+                                showSearchMenu = false
+                                searchQuery = ""
+                            },
+                            searchOffsetY = searchOffsetY.value,
+                            searchDragModifier = searchDragModifier
+                        )
+                    }
+                    // Right side: empty spacer/scrim that is clickable to close the search overlay (weight 0.9)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .weight(0.9f)
+                            .clickable(
+                                onClick = { showSearchMenu = false },
+                                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                indication = null
+                            )
+                    )
+                }
+            } else {
+                SearchOverlay(
+                    searchQuery = searchQuery,
+                    onSearchQueryChange = { searchQuery = it },
+                    searchResults = searchResults,
+                    onClose = { showSearchMenu = false },
+                    onResultClick = { date ->
+                        currentSelectedDate = date
+                        showSearchMenu = false
+                        searchQuery = ""
+                    },
+                    searchOffsetY = searchOffsetY.value,
+                    searchDragModifier = searchDragModifier
+                )
+            }
         }
     }
 }
@@ -1808,37 +1832,72 @@ fun PrayerTrackerRow(
                 label = "PrayerContent"
             )
 
-            Surface(
-                onClick = {
-                    viewModel.togglePrayer(date.toString(), prayer, !isChecked)
-                },
-                modifier = Modifier
-                    .weight(1f)
-                    .height(36.dp),
-                shape = RoundedCornerShape(50), // semi circular-rectangular (pill)
-                color = backgroundColor,
-                contentColor = contentColor,
-                shadowElevation = 2.dp
-            ) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier.fillMaxSize()
+            val isFuture = date.isAfter(java.time.LocalDate.now())
+            if (isFuture) {
+                Surface(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(36.dp),
+                    shape = RoundedCornerShape(50), // semi circular-rectangular (pill)
+                    color = backgroundColor,
+                    contentColor = contentColor,
+                    shadowElevation = 2.dp
                 ) {
-                    if (isChecked) {
-                        Icon(
-                            imageVector = Lucide.Check,
-                            contentDescription = "Checked",
-                            modifier = Modifier.size(16.dp)
-                        )
-                    } else {
-                        Text(
-                            text = prayer,
-                            fontFamily = liAdorNoirritFontFamily,
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                fontWeight = FontWeight.Normal,
-                                fontSize = 14.sp
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        if (isChecked) {
+                            Icon(
+                                imageVector = Lucide.Check,
+                                contentDescription = "Checked",
+                                modifier = Modifier.size(16.dp)
                             )
-                        )
+                        } else {
+                            Text(
+                                text = prayer,
+                                fontFamily = liAdorNoirritFontFamily,
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontWeight = FontWeight.Normal,
+                                    fontSize = 14.sp
+                                )
+                            )
+                        }
+                    }
+                }
+            } else {
+                Surface(
+                    onClick = {
+                        viewModel.togglePrayer(date.toString(), prayer, !isChecked)
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(36.dp),
+                    shape = RoundedCornerShape(50), // semi circular-rectangular (pill)
+                    color = backgroundColor,
+                    contentColor = contentColor,
+                    shadowElevation = 2.dp
+                ) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        if (isChecked) {
+                            Icon(
+                                imageVector = Lucide.Check,
+                                contentDescription = "Checked",
+                                modifier = Modifier.size(16.dp)
+                            )
+                        } else {
+                            Text(
+                                text = prayer,
+                                fontFamily = liAdorNoirritFontFamily,
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontWeight = FontWeight.Normal,
+                                    fontSize = 14.sp
+                                )
+                            )
+                        }
                     }
                 }
             }

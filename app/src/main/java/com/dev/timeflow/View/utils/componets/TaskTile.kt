@@ -103,7 +103,7 @@ fun TaskTile(
                 style = MaterialTheme.typography.bodyLarge.copy(
                     fontWeight = FontWeight.Normal,
                     fontSize = 18.sp,
-                    color = MaterialTheme.colorScheme.onBackground
+                    color = if (taskIsCompleted) Color.Gray else MaterialTheme.colorScheme.onBackground
                 )
             )
         }

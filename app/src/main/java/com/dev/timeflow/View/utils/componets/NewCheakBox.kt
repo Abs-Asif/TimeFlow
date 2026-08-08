@@ -15,6 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
@@ -34,9 +35,9 @@ fun NewCheckBox(
     )
     val view = LocalView.current
     val color =
-        if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface
+        if (isSelected) Color.Gray else MaterialTheme.colorScheme.surface
     val borderColor =
-        if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+        if (isSelected) Color.Gray else MaterialTheme.colorScheme.onSurface
     Box(
         modifier = modifier
             .padding(

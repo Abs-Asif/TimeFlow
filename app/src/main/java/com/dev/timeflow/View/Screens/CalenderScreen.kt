@@ -1567,6 +1567,7 @@ fun SearchOverlay(
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .padding(top = 64.dp)
             .graphicsLayer { translationY = searchOffsetY }
             .background(Color.Black) // AMOLED black background
     ) {

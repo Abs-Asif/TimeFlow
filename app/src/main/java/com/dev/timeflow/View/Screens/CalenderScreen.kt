@@ -35,6 +35,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -51,6 +52,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -76,6 +78,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -140,10 +143,14 @@ import kotlinx.coroutines.launch
 fun CalenderScreen(
     modifier: Modifier = Modifier
 ) {
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+
     val haptics = LocalHapticFeedback.current
     val localContext = LocalContext.current
     val focusManager = LocalFocusManager.current
     val taskViewModel: TaskAndEventViewModel = hiltViewModel()
+    val scope = rememberCoroutineScope()
 
     val permission = rememberPermissionState(
         permission = android.Manifest.permission.POST_NOTIFICATIONS
@@ -160,8 +167,8 @@ fun CalenderScreen(
         }
     }
     val currentMonth = remember { YearMonth.now() }
-    val startMonth = remember { currentMonth.minusMonths(100) }
-    val endMonth = remember { currentMonth.plusMonths(100) }
+    val startMonth = remember { YearMonth.of(1900, 1) }
+    val endMonth = remember { YearMonth.of(2200, 12) }
     val firstDayOfWeek = java.time.DayOfWeek.SATURDAY
 
     val state = rememberCalendarState(
@@ -205,6 +212,40 @@ fun CalenderScreen(
     var showSearchMenu by rememberSaveable { mutableStateOf(false) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
 
+    val searchOffsetY = remember { androidx.compose.animation.core.Animatable(0f) }
+    val searchDragModifier = Modifier.pointerInput(Unit) {
+        detectVerticalDragGestures(
+            onDragEnd = {
+                if (searchOffsetY.value > 300f) {
+                    showSearchMenu = false
+                    searchQuery = ""
+                    scope.launch { searchOffsetY.snapTo(0f) }
+                } else {
+                    scope.launch {
+                        searchOffsetY.animateTo(0f, spring(stiffness = Spring.StiffnessMedium))
+                    }
+                }
+            },
+            onDragCancel = {
+                scope.launch {
+                    searchOffsetY.animateTo(0f, spring(stiffness = Spring.StiffnessMedium))
+                }
+            },
+            onVerticalDrag = { change, dragAmount ->
+                change.consume()
+                scope.launch {
+                    searchOffsetY.snapTo((searchOffsetY.value + dragAmount).coerceAtLeast(0f))
+                }
+            }
+        )
+    }
+
+    LaunchedEffect(showSearchMenu) {
+        if (!showSearchMenu) {
+            searchOffsetY.snapTo(0f)
+        }
+    }
+
     // Var to hold state of the task name textfield
     var taskName by rememberSaveable { mutableStateOf("") }
 
@@ -227,8 +268,6 @@ fun CalenderScreen(
         initialHour = localTime.hour,
         initialMinute = localTime.minute
     )
-
-    val scope = rememberCoroutineScope()
 
     LaunchedEffect(currentSelectedDate) {
         Log.d("TASKDATE", "the function ran with the updated date $currentSelectedDate")
@@ -266,48 +305,28 @@ fun CalenderScreen(
     // Generates virtual Events representing preset unchangeable events for calendar lines
     val virtualPresetEvents = remember {
         val list = mutableListOf<Events>()
+        val presetTemplates = listOf(
+            PresetEventTemplate("আমাদের বিবাহ বার্ষিকী 🎉", 5, 29, "#E91E63"),
+            PresetEventTemplate("আসিফের জন্মদিন 🎉", 2, 18, "#FFA500"),
+            PresetEventTemplate("মোনালিসার জন্মদিন 🎉", 7, 5, "#008080"),
+            PresetEventTemplate("আদনানের জন্মদিন 🎉", 11, 2, "#FFA500"),
+            PresetEventTemplate("মাহিরার জন্মদিন 🎉", 11, 23, "#FFA500")
+        )
         for (year in 2000..2100) {
-            // May 29: Anniversary
-            val annivDate = LocalDate.of(year, 5, 29)
-            val annivStart = annivDate.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
-            list.add(
-                Events(
-                    id = -(year * 100 + 1).toLong(),
-                    name = "আমাদের বিবাহ বার্ষিকী 🎉",
-                    startDate = annivStart,
-                    endDate = annivDate.atStartOfDay(ZoneId.systemDefault()).plusDays(1).toInstant().toEpochMilli() - 1,
-                    colorHex = "#FF00FF", // Magenta
-                    createdAt = annivStart
+            presetTemplates.forEachIndexed { index, template ->
+                val date = LocalDate.of(year, template.month, template.day)
+                val start = date.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                list.add(
+                    Events(
+                        id = -(year * 100 + index + 1).toLong(),
+                        name = template.name,
+                        startDate = start,
+                        endDate = date.atStartOfDay(ZoneId.systemDefault()).plusDays(1).toInstant().toEpochMilli() - 1,
+                        colorHex = template.colorHex,
+                        createdAt = start
+                    )
                 )
-            )
-
-            // Feb 18: Asif's Birthday
-            val asifDate = LocalDate.of(year, 2, 18)
-            val asifStart = asifDate.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
-            list.add(
-                Events(
-                    id = -(year * 100 + 2).toLong(),
-                    name = "আসিফের জন্মদিন 🎉",
-                    startDate = asifStart,
-                    endDate = asifDate.atStartOfDay(ZoneId.systemDefault()).plusDays(1).toInstant().toEpochMilli() - 1,
-                    colorHex = "#FFA500", // Orange
-                    createdAt = asifStart
-                )
-            )
-
-            // July 5: Monalisa's Birthday
-            val monaDate = LocalDate.of(year, 7, 5)
-            val monaStart = monaDate.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
-            list.add(
-                Events(
-                    id = -(year * 100 + 3).toLong(),
-                    name = "মোনালিসার জন্মদিন 🎉",
-                    startDate = monaStart,
-                    endDate = monaDate.atStartOfDay(ZoneId.systemDefault()).plusDays(1).toInstant().toEpochMilli() - 1,
-                    colorHex = "#008080", // Teal
-                    createdAt = monaStart
-                )
-            )
+            }
         }
         list
     }
@@ -341,20 +360,51 @@ fun CalenderScreen(
     }
     val currentEvent by taskViewModel.currentEvent.collectAsState(null)
 
+    val searchResults = remember(allTasks, allEvents, searchQuery) {
+        val query = searchQuery.trim()
+        if (query.length < 2) {
+            emptyList<SearchResult>()
+        } else {
+            val taskList = allTasks.filter { it.name.contains(query, ignoreCase = true) }
+                .map { SearchResult.TaskResult(it) }
+
+            val eventList = allEvents.filter { it.name.contains(query, ignoreCase = true) }
+                .map { SearchResult.EventResult(it) }
+
+            val presetTemplates = listOf(
+                PresetEventTemplate("আমাদের বিবাহ বার্ষিকী 🎉", 5, 29, "#E91E63"),
+                PresetEventTemplate("আসিফের জন্মদিন 🎉", 2, 18, "#FFA500"),
+                PresetEventTemplate("মোনালিসার জন্মদিন 🎉", 7, 5, "#008080"),
+                PresetEventTemplate("আদনানের জন্মদিন 🎉", 11, 2, "#FFA500"),
+                PresetEventTemplate("মাহিরার জন্মদিন 🎉", 11, 23, "#FFA500")
+            )
+            val matchedPresets = presetTemplates.filter { it.name.contains(query, ignoreCase = true) }
+                .mapIndexed { index, template ->
+                    SearchResult.PresetEventResult(
+                        id = -(index + 1).toLong(),
+                        name = template.name,
+                        month = template.month,
+                        day = template.day,
+                        colorHex = template.colorHex
+                    )
+                }
+
+            (taskList + eventList + matchedPresets).sortedBy { it.epochMillis }
+        }
+    }
+
     val presetEvents = remember(currentSelectedDate) {
         val month = currentSelectedDate.monthValue
         val day = currentSelectedDate.dayOfMonth
-        val list = mutableListOf<Pair<String, String>>()
-        if (month == 5 && day == 29) {
-            list.add(Pair("আমাদের বিবাহ বার্ষিকী 🎉", "#FF00FF")) // Magenta
-        }
-        if (month == 2 && day == 18) {
-            list.add(Pair("আসিফের জন্মদিন 🎉", "#FFA500")) // Orange
-        }
-        if (month == 7 && day == 5) {
-            list.add(Pair("মোনালিসার জন্মদিন 🎉", "#008080")) // Teal
-        }
-        list
+        val templates = listOf(
+            PresetEventTemplate("আমাদের বিবাহ বার্ষিকী 🎉", 5, 29, "#E91E63"),
+            PresetEventTemplate("আসিফের জন্মদিন 🎉", 2, 18, "#FFA500"),
+            PresetEventTemplate("মোনালিসার জন্মদিন 🎉", 7, 5, "#008080"),
+            PresetEventTemplate("আদনানের জন্মদিন 🎉", 11, 2, "#FFA500"),
+            PresetEventTemplate("মাহিরার জন্মদিন 🎉", 11, 23, "#FFA500")
+        )
+        templates.filter { it.month == month && it.day == day }
+            .map { Pair(it.name, it.colorHex) }
     }
 
     val importanceChip = listOf<ImportanceChipModel>(
@@ -724,283 +774,705 @@ fun CalenderScreen(
             )
         }
 
-        Column(
-            modifier = modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .animateContentSize(animationSpec = spring(stiffness = Spring.StiffnessMedium))
-                    .then(verticalSwipeModifier)
-            ) {
-                AnimatedContent(
-                    targetState = isWeekMode,
-                    label = "CalendarViewMode",
-                    transitionSpec = {
-                        (fadeIn(animationSpec = spring(stiffness = Spring.StiffnessMedium)) togetherWith
-                         fadeOut(animationSpec = spring(stiffness = Spring.StiffnessMedium)))
-                    }
-                ) { weekMode ->
-                    if (weekMode) {
-                        WeekCalendar(
-                            modifier = modifier.padding(horizontal = 8.dp),
-                            state = weekState,
-                            dayContent = { weekDay ->
-                                val cellDate = weekDay.date
-                                val cellActiveEvents = combinedEvents.filter { event ->
-                                    val dateStart = event.startDate.toLocalDate()
-                                    val dateEnd = event.endDate.toLocalDate()
-                                    !cellDate.isBefore(dateStart) && !cellDate.isAfter(dateEnd)
-                                }
-                                WeekCalender(
-                                    selectedDate = currentSelectedDate,
-                                    onClick = { currentSelectedDate = it },
-                                    weekDate = weekDay,
-                                    activeEvents = cellActiveEvents,
-                                    eventLanes = eventLanes
-                                )
-                            }
-                        )
-                    } else {
-                        HorizontalCalendar(
-                            modifier = modifier.padding(horizontal = 8.dp),
-                            state = state,
-                            reverseLayout = false,
-                            dayContent = { day ->
-                                val cellDate = day.date
-                                val cellActiveEvents = combinedEvents.filter { event ->
-                                    val dateStart = event.startDate.toLocalDate()
-                                    val dateEnd = event.endDate.toLocalDate()
-                                    !cellDate.isBefore(dateStart) && !cellDate.isAfter(dateEnd)
-                                }
-                                MonthCalender(
-                                    day = day,
-                                    hapticFeedback = haptics,
-                                    selectedDate = currentSelectedDate,
-                                    activeEvents = cellActiveEvents,
-                                    eventLanes = eventLanes,
-                                    onClick = { date ->
-                                        currentSelectedDate = date
-                                    }
-                                )
-                            },
-                            monthHeader = {
-                                MonthHeader(
-                                    weekName = it.weekDays.first().map {
-                                        it.date.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault())
-                                    }
-                                )
-                            }
-                        )
-                    }
-                }
-            }
-
-            // Clear visible line (divider) separating the calendar and the task list
-            HorizontalDivider(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 12.dp, bottom = 4.dp, start = 16.dp, end = 16.dp),
-                thickness = 1.dp,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
-            )
-
-            // Prayer Tracker Row
-            PrayerTrackerRow(
-                date = currentSelectedDate,
-                viewModel = taskViewModel
-            )
-
-            // Final separating line
-            HorizontalDivider(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 4.dp, bottom = 12.dp, start = 16.dp, end = 16.dp),
-                thickness = 1.dp,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
-            )
-
-            Column(
+        if (isLandscape) {
+            Row(
                 modifier = modifier
-                    .weight(1f)
-                    .then(horizontalSwipeModifier)
+                    .fillMaxSize()
+                    .padding(innerPadding)
             ) {
-                AnimatedContent(
-                    targetState = currentSelectedDate,
-                    transitionSpec = {
-                        if (targetState.isAfter(initialState)) {
-                            (slideInHorizontally { width -> width } + fadeIn()) togetherWith
-                            (slideOutHorizontally { width -> -width } + fadeOut())
-                        } else {
-                            (slideInHorizontally { width -> -width } + fadeIn()) togetherWith
-                            (slideOutHorizontally { width -> width } + fadeOut())
-                        }
-                    },
-                    label = "DateTransition"
-                ) { targetDate ->
-                    val tasksForTargetDate = remember(allTasks, targetDate) {
-                        allTasks.filter { task ->
-                            val taskDate = task.taskTime?.toLocalDate() ?: task.createdAt.toLocalDate()
-                            taskDate == targetDate
-                        }
-                    }
-
-                    val eventsForTargetDate = remember(allEvents, targetDate) {
-                        allEvents.filter { event ->
-                            val dateStart = event.startDate.toLocalDate()
-                            val dateEnd = event.endDate.toLocalDate()
-                            !targetDate.isBefore(dateStart) && !targetDate.isAfter(dateEnd)
-                        }
-                    }
-
-                    val presetEventsForTargetDate = remember(targetDate) {
-                        val month = targetDate.monthValue
-                        val day = targetDate.dayOfMonth
-                        val list = mutableListOf<Pair<String, String>>()
-                        if (month == 5 && day == 29) {
-                            list.add(Pair("আমাদের বিবাহ বার্ষিকী 🎉", "#FF00FF")) // Magenta
-                        }
-                        if (month == 2 && day == 18) {
-                            list.add(Pair("আসিফের জন্মদিন 🎉", "#FFA500")) // Orange
-                        }
-                        if (month == 7 && day == 5) {
-                            list.add(Pair("মোনালিসার জন্মদিন 🎉", "#008080")) // Teal
-                        }
-                        list
-                    }
-
-                    val hasContent = tasksForTargetDate.isNotEmpty() || eventsForTargetDate.isNotEmpty() || presetEventsForTargetDate.isNotEmpty()
-
-                    if (hasContent) {
+                // Left side: Calendar with headers + Search Swipe up menu covering only this left side
+                Box(
+                    modifier = Modifier
+                        .weight(1.1f)
+                        .fillMaxHeight(),
+                    contentAlignment = Alignment.TopCenter
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
                         Column(
                             modifier = Modifier
-                                .fillMaxSize()
-                                .padding(horizontal = 16.dp)
+                                .fillMaxWidth()
+                                .animateContentSize(animationSpec = spring(stiffness = Spring.StiffnessMedium))
+                                .then(verticalSwipeModifier)
                         ) {
-                            LazyColumn(
-                                modifier = Modifier.fillMaxSize()
-                            ) {
-                                items(presetEventsForTargetDate) { (eventName, colorHex) ->
-                                    PresetEventTile(eventName = eventName, colorHex = colorHex)
+                            AnimatedContent(
+                                targetState = isWeekMode,
+                                label = "CalendarViewMode",
+                                transitionSpec = {
+                                    (fadeIn(animationSpec = spring(stiffness = Spring.StiffnessMedium)) togetherWith
+                                     fadeOut(animationSpec = spring(stiffness = Spring.StiffnessMedium)))
                                 }
-                                // Render Events ALWAYS on top of Tasks
-                                items(eventsForTargetDate) { event ->
-                                    EventTile(
-                                        eventName = event.name,
-                                        startDateStr = event.startDate.toLocalDate().format(DateTimeFormatter.ofPattern("dd MMM yyyy")),
-                                        endDateStr = event.endDate.toLocalDate().format(DateTimeFormatter.ofPattern("dd MMM yyyy")),
-                                        colorHex = event.colorHex,
-                                        onClick = {
-                                            taskViewModel.selectEvent(event)
-                                            showEventDetails = true
+                            ) { weekMode ->
+                                if (weekMode) {
+                                    WeekCalendar(
+                                        modifier = modifier.padding(horizontal = 8.dp),
+                                        state = weekState,
+                                        dayContent = { weekDay ->
+                                            val cellDate = weekDay.date
+                                            val cellActiveEvents = combinedEvents.filter { event ->
+                                                val dateStart = event.startDate.toLocalDate()
+                                                val dateEnd = event.endDate.toLocalDate()
+                                                !cellDate.isBefore(dateStart) && !cellDate.isAfter(dateEnd)
+                                            }
+                                            WeekCalender(
+                                                selectedDate = currentSelectedDate,
+                                                onClick = { currentSelectedDate = it },
+                                                weekDate = weekDay,
+                                                activeEvents = cellActiveEvents,
+                                                eventLanes = eventLanes
+                                            )
                                         }
                                     )
-                                }
-                                items(tasksForTargetDate) { task ->
-                                    TaskTile(
-                                        onUpdateTask = { value ->
-                                            taskViewModel.updateTask(
-                                                tasks = task.copy(
-                                                    isCompleted = value
-                                                )
+                                } else {
+                                    HorizontalCalendar(
+                                        modifier = modifier.padding(horizontal = 8.dp),
+                                        state = state,
+                                        reverseLayout = false,
+                                        dayContent = { day ->
+                                            val cellDate = day.date
+                                            val cellActiveEvents = combinedEvents.filter { event ->
+                                                val dateStart = event.startDate.toLocalDate()
+                                                val dateEnd = event.endDate.toLocalDate()
+                                                !cellDate.isBefore(dateStart) && !cellDate.isAfter(dateEnd)
+                                            }
+                                            MonthCalender(
+                                                day = day,
+                                                hapticFeedback = haptics,
+                                                selectedDate = currentSelectedDate,
+                                                activeEvents = cellActiveEvents,
+                                                eventLanes = eventLanes,
+                                                onClick = { date ->
+                                                    currentSelectedDate = date
+                                                }
                                             )
                                         },
-                                        taskName = task.name,
-                                        taskDescription = task.description,
-                                        taskIsCompleted = task.isCompleted,
-                                        taskImportance = task.importance,
-                                        taskNotification = task.notification,
-                                        taskTime = task.taskTime!!,
-                                        onClick = {
-                                            taskViewModel.selectTask(tasks = task)
-                                            showTaskDetails = true
+                                        monthHeader = {
+                                            MonthHeader(
+                                                weekName = it.weekDays.first().map {
+                                                    it.date.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault())
+                                                }
+                                            )
                                         }
                                     )
                                 }
                             }
                         }
-                    } else {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize(),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            AsyncImage(
-                                modifier = Modifier.size(150.dp),
-                                model = R.drawable.emptytask,
-                                contentDescription = null
-                            )
-                            Text(
-                                text = "Chill out buddy\nyou got nothing"
-                            )
-                        }
                     }
-                }
-            }
 
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-                    .padding(vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                // Separate event adding button on the left (outside the task adder text box)
-                Surface(
-                    onClick = { showEventBottomSheet = true },
-                    modifier = Modifier.size(44.dp),
-                    shape = androidx.compose.foundation.shape.CircleShape,
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    shadowElevation = 3.dp
-                ) {
-                    Box(
-                        contentAlignment = Alignment.Center,
+                    // Local Search Swipe-up Overlay
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = showSearchMenu,
+                        enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+                        exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
                         modifier = Modifier.fillMaxSize()
                     ) {
-                        Icon(
-                            imageVector = Lucide.CalendarDays,
-                            contentDescription = "Add Event",
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.size(20.dp)
+                        SearchOverlay(
+                            searchQuery = searchQuery,
+                            onSearchQueryChange = { searchQuery = it },
+                            searchResults = searchResults,
+                            onClose = { showSearchMenu = false },
+                            onResultClick = { date ->
+                                currentSelectedDate = date
+                                showSearchMenu = false
+                                searchQuery = ""
+                            },
+                            searchOffsetY = searchOffsetY.value,
+                            searchDragModifier = searchDragModifier
                         )
                     }
                 }
 
-                // Compact task adder typing area
-                Surface(
+                VerticalDivider(
                     modifier = Modifier
-                        .weight(1f)
-                        .height(44.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant,
-                    shape = RoundedCornerShape(22.dp),
-                    shadowElevation = 3.dp
+                        .fillMaxHeight()
+                        .padding(vertical = 16.dp),
+                    thickness = 1.dp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
+                )
+
+                // Right side: prayer tracker, tasks & events list, with adding features
+                Column(
+                    modifier = Modifier
+                        .weight(0.9f)
+                        .fillMaxHeight(),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    PrayerTrackerRow(
+                        date = currentSelectedDate,
+                        viewModel = taskViewModel
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    HorizontalDivider(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp),
+                        thickness = 1.dp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
+                    )
+
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .then(horizontalSwipeModifier)
+                    ) {
+                        AnimatedContent(
+                            targetState = currentSelectedDate,
+                            transitionSpec = {
+                                if (targetState.isAfter(initialState)) {
+                                    (slideInHorizontally { width -> width } + fadeIn()) togetherWith
+                                    (slideOutHorizontally { width -> -width } + fadeOut())
+                                } else {
+                                    (slideInHorizontally { width -> -width } + fadeIn()) togetherWith
+                                    (slideOutHorizontally { width -> width } + fadeOut())
+                                }
+                            },
+                            label = "DateTransition"
+                        ) { targetDate ->
+                            val tasksForTargetDate = remember(allTasks, targetDate) {
+                                allTasks.filter { task ->
+                                    val taskDate = task.taskTime?.toLocalDate() ?: task.createdAt.toLocalDate()
+                                    taskDate == targetDate
+                                }
+                            }
+
+                            val eventsForTargetDate = remember(allEvents, targetDate) {
+                                allEvents.filter { event ->
+                                    val dateStart = event.startDate.toLocalDate()
+                                    val dateEnd = event.endDate.toLocalDate()
+                                    !targetDate.isBefore(dateStart) && !targetDate.isAfter(dateEnd)
+                                }
+                            }
+
+                            val presetEventsForTargetDate = remember(targetDate) {
+                                val month = targetDate.monthValue
+                                val day = targetDate.dayOfMonth
+                                val templates = listOf(
+                                    PresetEventTemplate("আমাদের বিবাহ বার্ষিকী 🎉", 5, 29, "#E91E63"),
+                                    PresetEventTemplate("আসিফের জন্মদিন 🎉", 2, 18, "#FFA500"),
+                                    PresetEventTemplate("মোনালিসার জন্মদিন 🎉", 7, 5, "#008080"),
+                                    PresetEventTemplate("আদনানের জন্মদিন 🎉", 11, 2, "#FFA500"),
+                                    PresetEventTemplate("মাহিরার জন্মদিন 🎉", 11, 23, "#FFA500")
+                                )
+                                templates.filter { it.month == month && it.day == day }
+                                    .map { Pair(it.name, it.colorHex) }
+                            }
+
+                            val hasContent = tasksForTargetDate.isNotEmpty() || eventsForTargetDate.isNotEmpty() || presetEventsForTargetDate.isNotEmpty()
+
+                            if (hasContent) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(horizontal = 16.dp)
+                                ) {
+                                    LazyColumn(
+                                        modifier = Modifier.fillMaxSize()
+                                    ) {
+                                        items(presetEventsForTargetDate) { (eventName, colorHex) ->
+                                            PresetEventTile(eventName = eventName, colorHex = colorHex)
+                                        }
+                                        items(eventsForTargetDate) { event ->
+                                            EventTile(
+                                                eventName = event.name,
+                                                startDateStr = event.startDate.toLocalDate().format(DateTimeFormatter.ofPattern("dd MMM yyyy")),
+                                                endDateStr = event.endDate.toLocalDate().format(DateTimeFormatter.ofPattern("dd MMM yyyy")),
+                                                colorHex = event.colorHex,
+                                                onClick = {
+                                                    taskViewModel.selectEvent(event)
+                                                    showEventDetails = true
+                                                }
+                                            )
+                                        }
+                                        items(tasksForTargetDate) { task ->
+                                            TaskTile(
+                                                onUpdateTask = { value ->
+                                                    taskViewModel.updateTask(
+                                                        tasks = task.copy(
+                                                            isCompleted = value
+                                                        )
+                                                    )
+                                                },
+                                                taskName = task.name,
+                                                taskDescription = task.description,
+                                                taskIsCompleted = task.isCompleted,
+                                                taskImportance = task.importance,
+                                                taskNotification = task.notification,
+                                                taskTime = task.taskTime!!,
+                                                onClick = {
+                                                    taskViewModel.selectTask(tasks = task)
+                                                    showTaskDetails = true
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+                            } else {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxSize(),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center
+                                ) {
+                                    AsyncImage(
+                                        modifier = Modifier.size(100.dp),
+                                        model = R.drawable.emptytask,
+                                        contentDescription = null
+                                    )
+                                    Text(
+                                        text = "Chill out buddy\nyou got nothing"
+                                    )
+                                }
+                            }
+                        }
+                    }
+
                     Row(
                         modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp)
+                            .padding(top = 4.dp, bottom = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        BasicTextField(
-                            value = taskName,
-                            onValueChange = { taskName = it },
+                        Surface(
+                            onClick = { showEventBottomSheet = true },
+                            modifier = Modifier.size(44.dp),
+                            shape = androidx.compose.foundation.shape.CircleShape,
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            shadowElevation = 3.dp
+                        ) {
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier.fillMaxSize()
+                            ) {
+                                Icon(
+                                    imageVector = Lucide.CalendarDays,
+                                    contentDescription = "Add Event",
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+
+                        Surface(
                             modifier = Modifier
                                 .weight(1f)
-                                .padding(start = 12.dp, end = 8.dp),
-                            textStyle = MaterialTheme.typography.bodyMedium.copy(
-                                color = MaterialTheme.colorScheme.onSurface
-                            ),
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(
-                                imeAction = ImeAction.Send
-                            ),
-                            keyboardActions = KeyboardActions(
-                                onSend = {
+                                .height(44.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            shape = RoundedCornerShape(22.dp),
+                            shadowElevation = 3.dp
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(horizontal = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                BasicTextField(
+                                    value = taskName,
+                                    onValueChange = { taskName = it },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .padding(start = 12.dp, end = 8.dp),
+                                    textStyle = MaterialTheme.typography.bodyMedium.copy(
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    ),
+                                    singleLine = true,
+                                    keyboardOptions = KeyboardOptions(
+                                        imeAction = ImeAction.Send
+                                    ),
+                                    keyboardActions = KeyboardActions(
+                                        onSend = {
+                                            if (taskName.isNotEmpty()) {
+                                                taskViewModel.insertTask(
+                                                    tasks = Tasks(
+                                                        id = 0,
+                                                        name = taskName,
+                                                        description = "",
+                                                        notification = true,
+                                                        importance = "Low",
+                                                        taskTime = currentSelectedDate
+                                                            .atStartOfDay(ZoneId.systemDefault())
+                                                            .toInstant()
+                                                            .toEpochMilli(),
+                                                        createdAt = currentSelectedDate.toMillis(localTime = LocalTime.now())
+                                                    )
+                                                )
+                                                taskName = ""
+                                            }
+                                        }
+                                    ),
+                                    decorationBox = { innerTextField ->
+                                        Box(
+                                            contentAlignment = Alignment.CenterStart,
+                                            modifier = Modifier.fillMaxSize()
+                                        ) {
+                                            if (taskName.isEmpty()) {
+                                                Text(
+                                                    text = "Type your task here ",
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                                )
+                                            }
+                                            innerTextField()
+                                        }
+                                    }
+                                )
+
+                                IconButton(
+                                    modifier = Modifier.size(36.dp),
+                                    onClick = {
+                                        if (taskName.isNotEmpty()) {
+                                            taskViewModel.insertTask(
+                                                tasks = Tasks(
+                                                    id = 0,
+                                                    name = taskName,
+                                                    description = "",
+                                                    notification = true,
+                                                    importance = "Low",
+                                                    taskTime = currentSelectedDate
+                                                        .atStartOfDay(ZoneId.systemDefault())
+                                                        .toInstant()
+                                                        .toEpochMilli(),
+                                                    createdAt = currentSelectedDate.toMillis(localTime = LocalTime.now())
+                                                )
+                                            )
+                                            taskName = ""
+                                        }
+                                    },
+                                    enabled = taskName.isNotEmpty()
+                                ) {
+                                    Icon(
+                                        imageVector = Lucide.Send,
+                                        contentDescription = "Send Task",
+                                        tint = if (taskName.isNotEmpty()) MaterialTheme.colorScheme.primary else Color.Gray,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            Column(
+                modifier = modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .animateContentSize(animationSpec = spring(stiffness = Spring.StiffnessMedium))
+                        .then(verticalSwipeModifier)
+                ) {
+                    AnimatedContent(
+                        targetState = isWeekMode,
+                        label = "CalendarViewMode",
+                        transitionSpec = {
+                            (fadeIn(animationSpec = spring(stiffness = Spring.StiffnessMedium)) togetherWith
+                             fadeOut(animationSpec = spring(stiffness = Spring.StiffnessMedium)))
+                        }
+                    ) { weekMode ->
+                        if (weekMode) {
+                            WeekCalendar(
+                                modifier = modifier.padding(horizontal = 8.dp),
+                                state = weekState,
+                                dayContent = { weekDay ->
+                                    val cellDate = weekDay.date
+                                    val cellActiveEvents = combinedEvents.filter { event ->
+                                        val dateStart = event.startDate.toLocalDate()
+                                        val dateEnd = event.endDate.toLocalDate()
+                                        !cellDate.isBefore(dateStart) && !cellDate.isAfter(dateEnd)
+                                    }
+                                    WeekCalender(
+                                        selectedDate = currentSelectedDate,
+                                        onClick = { currentSelectedDate = it },
+                                        weekDate = weekDay,
+                                        activeEvents = cellActiveEvents,
+                                        eventLanes = eventLanes
+                                    )
+                                }
+                            )
+                        } else {
+                            HorizontalCalendar(
+                                modifier = modifier.padding(horizontal = 8.dp),
+                                state = state,
+                                reverseLayout = false,
+                                dayContent = { day ->
+                                    val cellDate = day.date
+                                    val cellActiveEvents = combinedEvents.filter { event ->
+                                        val dateStart = event.startDate.toLocalDate()
+                                        val dateEnd = event.endDate.toLocalDate()
+                                        !cellDate.isBefore(dateStart) && !cellDate.isAfter(dateEnd)
+                                    }
+                                    MonthCalender(
+                                        day = day,
+                                        hapticFeedback = haptics,
+                                        selectedDate = currentSelectedDate,
+                                        activeEvents = cellActiveEvents,
+                                        eventLanes = eventLanes,
+                                        onClick = { date ->
+                                            currentSelectedDate = date
+                                        }
+                                    )
+                                },
+                                monthHeader = {
+                                    MonthHeader(
+                                        weekName = it.weekDays.first().map {
+                                            it.date.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault())
+                                        }
+                                    )
+                                }
+                            )
+                        }
+                    }
+                }
+
+                // Clear visible line (divider) separating the calendar and the task list
+                HorizontalDivider(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 12.dp, bottom = 4.dp, start = 16.dp, end = 16.dp),
+                    thickness = 1.dp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
+                )
+
+                // Prayer Tracker Row
+                PrayerTrackerRow(
+                    date = currentSelectedDate,
+                    viewModel = taskViewModel
+                )
+
+                // Final separating line
+                HorizontalDivider(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 4.dp, bottom = 12.dp, start = 16.dp, end = 16.dp),
+                    thickness = 1.dp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
+                )
+
+                Column(
+                    modifier = modifier
+                        .weight(1f)
+                        .then(horizontalSwipeModifier)
+                ) {
+                    AnimatedContent(
+                        targetState = currentSelectedDate,
+                        transitionSpec = {
+                            if (targetState.isAfter(initialState)) {
+                                (slideInHorizontally { width -> width } + fadeIn()) togetherWith
+                                (slideOutHorizontally { width -> -width } + fadeOut())
+                            } else {
+                                (slideInHorizontally { width -> -width } + fadeIn()) togetherWith
+                                (slideOutHorizontally { width -> width } + fadeOut())
+                            }
+                        },
+                        label = "DateTransition"
+                    ) { targetDate ->
+                        val tasksForTargetDate = remember(allTasks, targetDate) {
+                            allTasks.filter { task ->
+                                val taskDate = task.taskTime?.toLocalDate() ?: task.createdAt.toLocalDate()
+                                taskDate == targetDate
+                            }
+                        }
+
+                        val eventsForTargetDate = remember(allEvents, targetDate) {
+                            allEvents.filter { event ->
+                                val dateStart = event.startDate.toLocalDate()
+                                val dateEnd = event.endDate.toLocalDate()
+                                !targetDate.isBefore(dateStart) && !targetDate.isAfter(dateEnd)
+                            }
+                        }
+
+                        val presetEventsForTargetDate = remember(targetDate) {
+                            val month = targetDate.monthValue
+                            val day = targetDate.dayOfMonth
+                            val templates = listOf(
+                                PresetEventTemplate("আমাদের বিবাহ বার্ষিকী 🎉", 5, 29, "#E91E63"),
+                                PresetEventTemplate("আসিফের জন্মদিন 🎉", 2, 18, "#FFA500"),
+                                PresetEventTemplate("মোনালিসার জন্মদিন 🎉", 7, 5, "#008080"),
+                                PresetEventTemplate("আদনানের জন্মদিন 🎉", 11, 2, "#FFA500"),
+                                PresetEventTemplate("মাহিরার জন্মদিন 🎉", 11, 23, "#FFA500")
+                            )
+                            templates.filter { it.month == month && it.day == day }
+                                .map { Pair(it.name, it.colorHex) }
+                        }
+
+                        val hasContent = tasksForTargetDate.isNotEmpty() || eventsForTargetDate.isNotEmpty() || presetEventsForTargetDate.isNotEmpty()
+
+                        if (hasContent) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(horizontal = 16.dp)
+                            ) {
+                                LazyColumn(
+                                    modifier = Modifier.fillMaxSize()
+                                ) {
+                                    items(presetEventsForTargetDate) { (eventName, colorHex) ->
+                                        PresetEventTile(eventName = eventName, colorHex = colorHex)
+                                    }
+                                    // Render Events ALWAYS on top of Tasks
+                                    items(eventsForTargetDate) { event ->
+                                        EventTile(
+                                            eventName = event.name,
+                                            startDateStr = event.startDate.toLocalDate().format(DateTimeFormatter.ofPattern("dd MMM yyyy")),
+                                            endDateStr = event.endDate.toLocalDate().format(DateTimeFormatter.ofPattern("dd MMM yyyy")),
+                                            colorHex = event.colorHex,
+                                            onClick = {
+                                                taskViewModel.selectEvent(event)
+                                                showEventDetails = true
+                                            }
+                                        )
+                                    }
+                                    items(tasksForTargetDate) { task ->
+                                        TaskTile(
+                                            onUpdateTask = { value ->
+                                                taskViewModel.updateTask(
+                                                    tasks = task.copy(
+                                                        isCompleted = value
+                                                    )
+                                                )
+                                            },
+                                            taskName = task.name,
+                                            taskDescription = task.description,
+                                            taskIsCompleted = task.isCompleted,
+                                            taskImportance = task.importance,
+                                            taskNotification = task.notification,
+                                            taskTime = task.taskTime!!,
+                                            onClick = {
+                                                taskViewModel.selectTask(tasks = task)
+                                                showTaskDetails = true
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        } else {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxSize(),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                AsyncImage(
+                                    modifier = Modifier.size(150.dp),
+                                    model = R.drawable.emptytask,
+                                    contentDescription = null
+                                )
+                                Text(
+                                    text = "Chill out buddy\nyou got nothing"
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                        .padding(top = 8.dp, bottom = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // Separate event adding button on the left (outside the task adder text box)
+                    Surface(
+                        onClick = { showEventBottomSheet = true },
+                        modifier = Modifier.size(44.dp),
+                        shape = androidx.compose.foundation.shape.CircleShape,
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        shadowElevation = 3.dp
+                    ) {
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            Icon(
+                                imageVector = Lucide.CalendarDays,
+                                contentDescription = "Add Event",
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+
+                    // Compact task adder typing area
+                    Surface(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(44.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        shape = RoundedCornerShape(22.dp),
+                        shadowElevation = 3.dp
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            BasicTextField(
+                                value = taskName,
+                                onValueChange = { taskName = it },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(start = 12.dp, end = 8.dp),
+                                textStyle = MaterialTheme.typography.bodyMedium.copy(
+                                    color = MaterialTheme.colorScheme.onSurface
+                                ),
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(
+                                    imeAction = ImeAction.Send
+                                ),
+                                keyboardActions = KeyboardActions(
+                                    onSend = {
+                                        if (taskName.isNotEmpty()) {
+                                            taskViewModel.insertTask(
+                                                tasks = Tasks(
+                                                    id = 0,
+                                                    name = taskName,
+                                                    description = "",
+                                                    notification = true,
+                                                    importance = "Low",
+                                                    taskTime = currentSelectedDate
+                                                        .atStartOfDay(ZoneId.systemDefault())
+                                                        .toInstant()
+                                                        .toEpochMilli(),
+                                                    createdAt = currentSelectedDate.toMillis(localTime = LocalTime.now())
+                                                )
+                                            )
+                                            taskName = ""
+                                        }
+                                    }
+                                ),
+                                decorationBox = { innerTextField ->
+                                    Box(
+                                        contentAlignment = Alignment.CenterStart,
+                                        modifier = Modifier.fillMaxSize()
+                                    ) {
+                                        if (taskName.isEmpty()) {
+                                            Text(
+                                                text = "Type your task here ",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                            )
+                                        }
+                                        innerTextField()
+                                    }
+                                }
+                            )
+
+                            // Separate paper plane (send) button on the right side
+                            IconButton(
+                                modifier = Modifier.size(36.dp),
+                                onClick = {
                                     if (taskName.isNotEmpty()) {
                                         taskViewModel.insertTask(
                                             tasks = Tasks(
@@ -1018,55 +1490,16 @@ fun CalenderScreen(
                                         )
                                         taskName = ""
                                     }
-                                }
-                            ),
-                            decorationBox = { innerTextField ->
-                                Box(
-                                    contentAlignment = Alignment.CenterStart,
-                                    modifier = Modifier.fillMaxSize()
-                                ) {
-                                    if (taskName.isEmpty()) {
-                                        Text(
-                                            text = "Type your task here ",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                                        )
-                                    }
-                                    innerTextField()
-                                }
+                                },
+                                enabled = taskName.isNotEmpty()
+                            ) {
+                                Icon(
+                                    imageVector = Lucide.Send,
+                                    contentDescription = "Send Task",
+                                    tint = if (taskName.isNotEmpty()) MaterialTheme.colorScheme.primary else Color.Gray,
+                                    modifier = Modifier.size(20.dp)
+                                )
                             }
-                        )
-
-                        // Separate paper plane (send) button on the right side
-                        IconButton(
-                            modifier = Modifier.size(36.dp),
-                            onClick = {
-                                if (taskName.isNotEmpty()) {
-                                    taskViewModel.insertTask(
-                                        tasks = Tasks(
-                                            id = 0,
-                                            name = taskName,
-                                            description = "",
-                                            notification = true,
-                                            importance = "Low",
-                                            taskTime = currentSelectedDate
-                                                .atStartOfDay(ZoneId.systemDefault())
-                                                .toInstant()
-                                                .toEpochMilli(),
-                                            createdAt = currentSelectedDate.toMillis(localTime = LocalTime.now())
-                                        )
-                                    )
-                                    taskName = ""
-                                }
-                            },
-                            enabled = taskName.isNotEmpty()
-                        ) {
-                            Icon(
-                                imageVector = Lucide.Send,
-                                contentDescription = "Send Task",
-                                tint = if (taskName.isNotEmpty()) MaterialTheme.colorScheme.primary else Color.Gray,
-                                modifier = Modifier.size(20.dp)
-                            )
                         }
                     }
                 }
@@ -1075,192 +1508,228 @@ fun CalenderScreen(
 
         // Search Slide-up Overlay
         AnimatedVisibility(
-            visible = showSearchMenu,
+            visible = showSearchMenu && !isLandscape,
             enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
             exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
         ) {
-            val searchResults = remember(allTasks, allEvents, virtualPresetEvents, searchQuery) {
-                val query = searchQuery.trim()
-                if (query.length < 2) {
-                    emptyList<SearchResult>()
-                } else {
-                    val taskList = allTasks.filter { it.name.contains(query, ignoreCase = true) }
-                        .map { SearchResult.TaskResult(it) }
+            SearchOverlay(
+                searchQuery = searchQuery,
+                onSearchQueryChange = { searchQuery = it },
+                searchResults = searchResults,
+                onClose = { showSearchMenu = false },
+                onResultClick = { date ->
+                    currentSelectedDate = date
+                    showSearchMenu = false
+                    searchQuery = ""
+                },
+                searchOffsetY = searchOffsetY.value,
+                searchDragModifier = searchDragModifier
+            )
+        }
+    }
+}
+}
 
-                    val combinedEventsList = allEvents + virtualPresetEvents
-                    val eventList = combinedEventsList.filter { it.name.contains(query, ignoreCase = true) }
-                        .map { SearchResult.EventResult(it) }
+@Composable
+fun SearchOverlay(
+    searchQuery: String,
+    onSearchQueryChange: (String) -> Unit,
+    searchResults: List<SearchResult>,
+    onClose: () -> Unit,
+    onResultClick: (LocalDate) -> Unit,
+    searchOffsetY: Float,
+    searchDragModifier: Modifier
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .graphicsLayer { translationY = searchOffsetY }
+            .background(Color.Black) // AMOLED black background
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize()
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(searchDragModifier)
+            ) {
+                // Drag handle
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(width = 40.dp, height = 4.dp)
+                            .background(Color.Gray.copy(alpha = 0.5f), RoundedCornerShape(2.dp))
+                    )
+                }
 
-                    (taskList + eventList).sortedBy { it.epochMillis }
+                // Compact Search Bar Row
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .height(44.dp)
+                        .background(Color(0xFF1E1E1E), RoundedCornerShape(22.dp))
+                        .padding(horizontal = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Lucide.Search,
+                        contentDescription = "Search Icon",
+                        tint = Color.Gray,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    BasicTextField(
+                        value = searchQuery,
+                        onValueChange = onSearchQueryChange,
+                        modifier = Modifier.weight(1f),
+                        textStyle = MaterialTheme.typography.bodyLarge.copy(color = Color.White),
+                        singleLine = true,
+                        decorationBox = { innerTextField ->
+                            Box(contentAlignment = Alignment.CenterStart, modifier = Modifier.fillMaxSize()) {
+                                if (searchQuery.isEmpty()) {
+                                    Text(
+                                        text = "Search tasks and events...",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = Color.Gray
+                                    )
+                                }
+                                innerTextField()
+                            }
+                        }
+                    )
+                    IconButton(
+                        onClick = {
+                            if (searchQuery.isNotEmpty()) {
+                                onSearchQueryChange("")
+                            } else {
+                                onClose()
+                            }
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Lucide.X,
+                            contentDescription = "Clear or Close",
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
             }
 
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.6f))
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(top = 40.dp) // leaves a very little space on the top
-                        .background(Color.Black) // AMOLED black background
-                        .clickable(enabled = false) {} // block clicks from passing through
-                ) {
-                    // Wide Search Bar Row
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 12.dp)
-                            .height(52.dp)
-                            .background(Color(0xFF1E1E1E), RoundedCornerShape(26.dp))
-                            .padding(horizontal = 16.dp),
-                        verticalAlignment = Alignment.CenterVertically
+            Spacer(modifier = Modifier.height(4.dp))
+
+            if (searchQuery.trim().length >= 2) {
+                if (searchResults.isEmpty()) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            imageVector = Lucide.Search,
-                            contentDescription = "Search Icon",
-                            tint = Color.Gray,
-                            modifier = Modifier.size(20.dp)
+                        Text(
+                            text = "No results found",
+                            color = Color.Gray,
+                            style = MaterialTheme.typography.bodyLarge
                         )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        BasicTextField(
-                            value = searchQuery,
-                            onValueChange = { searchQuery = it },
-                            modifier = Modifier.weight(1f),
-                            textStyle = MaterialTheme.typography.bodyLarge.copy(color = Color.White),
-                            singleLine = true,
-                            decorationBox = { innerTextField ->
-                                Box(contentAlignment = Alignment.CenterStart, modifier = Modifier.fillMaxSize()) {
-                                    if (searchQuery.isEmpty()) {
-                                        Text(
-                                            text = "Search tasks and events...",
-                                            style = MaterialTheme.typography.bodyLarge,
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp) // compact gaps
+                    ) {
+                        items(searchResults) { result ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        onResultClick(result.date)
+                                    }
+                                    .padding(vertical = 6.dp), // compact padding
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                val icon = when (result) {
+                                    is SearchResult.TaskResult -> Lucide.ListTodo
+                                    is SearchResult.EventResult -> {
+                                        if (result.name.contains("বিবাহ বার্ষিকী")) Lucide.Heart else Lucide.Calendar
+                                    }
+                                    is SearchResult.PresetEventResult -> {
+                                        if (result.name.contains("বিবাহ বার্ষিকী")) Lucide.Heart else Lucide.Calendar
+                                    }
+                                }
+                                val color = when (result) {
+                                    is SearchResult.TaskResult -> MaterialTheme.colorScheme.primary
+                                    is SearchResult.EventResult -> {
+                                        val hex = result.event.colorHex
+                                        if (hex.isNotEmpty()) Color(android.graphics.Color.parseColor(hex)) else MaterialTheme.colorScheme.secondary
+                                    }
+                                    is SearchResult.PresetEventResult -> {
+                                        Color(android.graphics.Color.parseColor(result.colorHex))
+                                    }
+                                }
+
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp) // compact icon size
+                                        .background(color.copy(alpha = 0.15f), RoundedCornerShape(8.dp)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = icon,
+                                        contentDescription = null,
+                                        tint = color,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.width(12.dp))
+
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = result.name,
+                                        fontFamily = liAdorNoirritFontFamily,
+                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                            color = Color.White,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    )
+                                    val dateText = if (result is SearchResult.PresetEventResult) {
+                                        val formatter = DateTimeFormatter.ofPattern("dd MMMM")
+                                        "Each year on ${result.date.format(formatter)}"
+                                    } else {
+                                        result.date.format(DateTimeFormatter.ofPattern("EEEE, dd MMMM yyyy"))
+                                    }
+                                    Text(
+                                        text = dateText,
+                                        style = MaterialTheme.typography.bodySmall.copy(
                                             color = Color.Gray
                                         )
-                                    }
-                                    innerTextField()
+                                    )
                                 }
                             }
-                        )
-                        IconButton(
-                            onClick = {
-                                if (searchQuery.isNotEmpty()) {
-                                    searchQuery = ""
-                                } else {
-                                    showSearchMenu = false
-                                }
-                            }
-                        ) {
-                            Icon(
-                                imageVector = Lucide.X,
-                                contentDescription = "Clear or Close",
-                                tint = Color.White,
-                                modifier = Modifier.size(20.dp)
-                            )
                         }
                     }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    if (searchQuery.trim().length >= 2) {
-                        if (searchResults.isEmpty()) {
-                            Box(
-                                modifier = Modifier.fillMaxSize(),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "No results found",
-                                    color = Color.Gray,
-                                    style = MaterialTheme.typography.bodyLarge
-                                )
-                            }
-                        } else {
-                            LazyColumn(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(horizontal = 16.dp),
-                                verticalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                items(searchResults) { result ->
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clickable {
-                                                currentSelectedDate = result.date
-                                                showSearchMenu = false
-                                                searchQuery = ""
-                                            }
-                                            .padding(vertical = 8.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        val icon = when (result) {
-                                            is SearchResult.TaskResult -> Lucide.ListTodo
-                                            is SearchResult.EventResult -> {
-                                                if (result.name.contains("বিবাহ বার্ষিকী")) Lucide.Heart else Lucide.Calendar
-                                            }
-                                        }
-                                        val color = when (result) {
-                                            is SearchResult.TaskResult -> MaterialTheme.colorScheme.primary
-                                            is SearchResult.EventResult -> {
-                                                val hex = result.event.colorHex
-                                                if (hex.isNotEmpty()) Color(android.graphics.Color.parseColor(hex)) else MaterialTheme.colorScheme.secondary
-                                            }
-                                        }
-
-                                        Box(
-                                            modifier = Modifier
-                                                .size(40.dp)
-                                                .background(color.copy(alpha = 0.15f), RoundedCornerShape(8.dp)),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Icon(
-                                                imageVector = icon,
-                                                contentDescription = null,
-                                                tint = color,
-                                                modifier = Modifier.size(20.dp)
-                                            )
-                                        }
-
-                                        Spacer(modifier = Modifier.width(16.dp))
-
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Text(
-                                                text = result.name,
-                                                fontFamily = liAdorNoirritFontFamily,
-                                                style = MaterialTheme.typography.bodyLarge.copy(
-                                                    color = Color.White,
-                                                    fontWeight = FontWeight.Medium
-                                                )
-                                            )
-                                            Text(
-                                                text = result.date.format(DateTimeFormatter.ofPattern("EEEE, dd MMMM yyyy")),
-                                                style = MaterialTheme.typography.bodySmall.copy(
-                                                    color = Color.Gray
-                                                )
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    } else {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "Type at least 2 letters to search",
-                                color = Color.Gray,
-                                style = MaterialTheme.typography.bodyLarge
-                            )
-                        }
-                    }
+                }
+            } else {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Type at least 2 letters to search",
+                        color = Color.Gray,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
                 }
             }
         }
     }
-}
 }
 
 sealed class SearchResult {
@@ -1284,7 +1753,24 @@ sealed class SearchResult {
         override val date: LocalDate = event.startDate.toLocalDate(),
         override val epochMillis: Long = event.startDate
     ) : SearchResult()
+
+    data class PresetEventResult(
+        override val id: Long,
+        override val name: String,
+        val month: Int,
+        val day: Int,
+        val colorHex: String,
+        override val date: LocalDate = LocalDate.of(LocalDate.now().year, month, day),
+        override val epochMillis: Long = date.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+    ) : SearchResult()
 }
+
+data class PresetEventTemplate(
+    val name: String,
+    val month: Int,
+    val day: Int,
+    val colorHex: String
+)
 
 val liAdorNoirritFontFamily = FontFamily(
     Font(R.font.li_ador_noirrit_regular)
@@ -1296,7 +1782,12 @@ fun PrayerTrackerRow(
     viewModel: com.dev.timeflow.Viewmodel.TaskAndEventViewModel,
     modifier: Modifier = Modifier
 ) {
-    val prayers = listOf("ফজর", "যোহর", "আসর", "মাগরিব", "এশা")
+    val isFriday = date.dayOfWeek == java.time.DayOfWeek.FRIDAY
+    val prayers = if (isFriday) {
+        listOf("ফজর", "জুমআ", "আসর", "মাগরিব", "এশা")
+    } else {
+        listOf("ফজর", "যোহর", "আসর", "মাগরিব", "এশা")
+    }
     val checkedPrayers by viewModel.getCheckedPrayers(date.toString()).collectAsState(initial = emptySet())
 
     Row(

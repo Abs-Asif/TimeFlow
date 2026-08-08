@@ -57,7 +57,7 @@ jobs:
             Automatic release for merge to master.
             Version: ${{ env.VERSION_NAME }}
           files: |
-            app/build/outputs/apk/release/Calculator-${{ env.VERSION_NAME }}.apk
+            app/build/outputs/apk/release/Calendar-${{ env.VERSION_NAME }}.apk
           draft: false
           prerelease: false
         env:
